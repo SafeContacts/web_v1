@@ -23,6 +23,8 @@ export default function Business() {
             <Button size="sm" mt={2} onClick={()=>axios.post(`/api/business/${b.businessId}/claim`)}>Claim</Button>
           </Box>
         ))}
+
       </VStack>
     </Box>
+  )
 }
