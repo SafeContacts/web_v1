@@ -2,6 +2,7 @@
 import { Box, Text, Button } from '@chakra-ui/react';
 import React from 'react';
 import CallButton from './CallButton';
+import SmsButton  from './SmsButton';
 
 export interface Business {
   businessId: string;
@@ -14,6 +15,7 @@ const BusinessCard: React.FC<{ biz: Business }> = ({ biz }) => (
     <Text fontWeight="bold">{biz.name}</Text>
     <Text>Rating: {biz.rating}</Text>
     <CallButton contactId={contact._id} phone={contact.phone} />
+    <SmsButton  contactId={contact._id} phone={contact.phone} />
     <Button size="sm" mt={2} onClick={() => 
       fetch(`/api/business/${biz.businessId}/claim`, { method: 'POST' })
     }>Claim</Button>

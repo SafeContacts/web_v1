@@ -4,6 +4,8 @@ import axios from 'axios';
 import { Box, Heading, VStack, Spinner, Alert, AlertIcon } from '@chakra-ui/react';
 import UpdateEventCard, { UpdateEvent } from '../components/UpdateEventCard';
 import { useToast } from '@chakra-ui/react';
+import withPaywall from '../components/withPaywall';
+
 
 
 export default function UpdatesPage() {
@@ -116,4 +118,4 @@ export default function UpdatesPage() {
     </Box>
   );
 }
-
+export default withPaywall(UpdatesPage);
