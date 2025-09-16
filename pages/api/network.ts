@@ -1,42 +1,43 @@
+// pages/api/network.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { connect }             from '../../lib/mongodb';
 import TrustEdge               from '../../models/TrustEdge';
-import User                    from '../../models/User';
-
-type Node = { id: string; name: string };
-type Link = { source: string; target: string };
+import Contact                 from '../../models/Contact';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   await connect();
   const { userId } = req.query as { userId: string };
-  if (!userId) return res.status(400).json({ error: 'userId required' });
 
-  // find confirmed edges involving this user
+  // 1) Gather confirmed edges
   const edges = await TrustEdge.find({
     confirmed: true,
-    $or: [
-      { fromUser: userId },
-      { toUser:   userId }
-    ]
+    $or: [ { fromUser: userId }, { toUser: userId } ]
   }).lean();
 
-  // build nodes set
+  // 2) Build set of involved contact IDs
   const ids = new Set<string>();
   ids.add(userId);
   edges.forEach(e => {
-    ids.add(e.fromUser);
-    ids.add(e.toUser);
+    ids.add(e.fromUser.toString());
+    ids.add(e.toUser.toString());
   });
 
-  // fetch user names
-  const users = await User.find({ _id: { $in: Array.from(ids) } }).lean();
-  const nodes: Node[] = users.map(u => ({ id: u._id.toString(), name: u.name }));
+  // 3) Fetch Contact docs (alive + metadata)
+  const contacts = await Contact.find({ _id: { $in: Array.from(ids) } }).lean();
 
-  // build links
-  const links: Link[] = edges.map(e => ({
+  const nodes = contacts.map(c => ({
+    id:            c._id.toString(),
+    name:          c.name,
+    isRegistered:  c.isRegistered,
+    tags:          c.tags,
+    confidence:    c.confidenceScore
+  }));
+
+  const links = edges.map(e => ({
     source: e.fromUser.toString(),
     target: e.toUser.toString()
   }));
 
   res.status(200).json({ nodes, links });
 }
+

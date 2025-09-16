@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../src/lib/api';
 import { Box, Input, Button, VStack } from '@chakra-ui/react';
 import ContactCard from '../components/ContactCard';
 
@@ -8,7 +8,7 @@ export default function Discovery() {
   const [results, setResults] = useState<any[]>([]);
 
   const search = async () => {
-    const res = await axios.get('/api/contacts/discovery', { params: { query } });
+    const res = await api.get('/api/contacts/discovery', { params: { query } });
     setResults(res.data);
   };
 

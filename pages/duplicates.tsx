@@ -1,6 +1,6 @@
 // pages/duplicates.tsx
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../src/lib/api';
 import {
   Box,
   Heading,
@@ -20,7 +20,7 @@ export default function DuplicatesPage() {
 
   const mergeGroup = async (grp: string[]) => {
     try {
-      await axios.post('/api/duplicates/merge', { group: grp });
+      await api.post('/api/duplicates/merge', { group: grp });
       toast({ status: 'success', title: 'Contacts merged' });
       await refetch();
     } catch (err: any) {

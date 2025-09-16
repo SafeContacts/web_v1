@@ -1,6 +1,6 @@
 // pages/updates.tsx
 import { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../src/lib/api';
 import { Box, Heading, VStack, Spinner, Alert, AlertIcon } from '@chakra-ui/react';
 import UpdateEventCard, { UpdateEvent } from '../components/UpdateEventCard';
 import { useToast } from '@chakra-ui/react';
@@ -16,7 +16,7 @@ export default function UpdatesPage() {
 
 
   useEffect(() => {
-    axios.get<UpdateEvent[]>('/api/updates')
+    api.get<UpdateEvent[]>('/api/updates')
       .then(res => setEvents(res.data))
       .catch(err => {
         console.error(err);
@@ -29,13 +29,13 @@ export default function UpdatesPage() {
     try {
       console.log('Patching contact at:', `/api/contacts/${evt.contactId}`);
       // 1) Patch the contact
-      await axios.patch(`/api/contacts/${evt.contactId}`, {
+      await api.patch(`/api/contacts/${evt.contactId}`, {
         [evt.field]: evt.newValue
       });
 
       console.log('Marking event as non-stealth:', `/api/contacts/${evt.contactId}/update`);
       // 2) Mark the update event as applied (stealth: false)
-      await axios.post(`/api/contacts/${evt.contactId}/update`, {
+      await api.post(`/api/contacts/${evt.contactId}/update`, {
         field:    evt.field,
         oldValue: evt.oldValue,
         newValue: evt.newValue,
@@ -75,7 +75,7 @@ export default function UpdatesPage() {
 
   const ignoreEvent = async (evt: UpdateEvent) => {
     // Mark as non-stealth so it won’t reappear
-    await axios.post(`/api/contacts/${evt.contactId}/update`, {
+    await api.post(`/api/contacts/${evt.contactId}/update`, {
       field: evt.field,
       oldValue: evt.oldValue,
       newValue: evt.newValue,
@@ -118,4 +118,5 @@ export default function UpdatesPage() {
     </Box>
   );
 }
-export default withPaywall(UpdatesPage);
+//export default withPaywall(UpdatesPage);
+//export {withPaywall(UpdatesPage)};

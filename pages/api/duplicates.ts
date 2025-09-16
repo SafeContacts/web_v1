@@ -2,6 +2,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { connect } from '../../lib/mongodb';
 import Contact from '../../models/Contact';
+import { requireAuth } from '../../../src/middleware/requireAuth';
+
 
 type DuplicateGroups = string[][];
 
@@ -25,3 +27,4 @@ export default async function handler(
   res.status(200).json(groups);
 }
 
+export default requireAuth(handler, ['user','admin']);

@@ -42,6 +42,23 @@ export default async function handler(
       return
     }
 
+    // also upsert into global Contact collection
+    await Contact.findOneAndUpdate(
+	{ phone: updated.phone },
+	{
+	   phone: updated.phone,
+	   name:  updated.name,
+	   $setOnInsert: { confidenceScore: 0, tags: [], isRegistered:false }
+	},
+	{ upsert:true }
+    );
+    
+    // And when you log an update event, recalc confidence:
+    const updatedContact = await Contact.findOne({ phone });
+    updatedContact.confidenceScore = calculateNewScore(updatedContact);
+    await updatedContact.save();
+
+
     // Method not allowed
     res.setHeader('Allow', ['GET', 'PATCH'])
     res.status(405).end(`Method ${req.method} Not Allowed`)

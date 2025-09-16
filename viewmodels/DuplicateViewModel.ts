@@ -1,23 +1,30 @@
 // viewmodels/DuplicateViewModel.ts
-import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useState, useEffect, useCallback } from 'react';
+import api from '../src/lib/api';
 
 export default function useDuplicateViewModel() {
-  const [groups, setGroups] = useState<string[][]>([]);
-  const [loading, setLoading] = useState(true);
+  const [groups, setGroups]     = useState<string[][]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
 
-  useEffect(() => {
-    axios
-      .get<string[][]>('/api/duplicates')
-      .then((res) => {
-        setGroups(res.data);
-      })
-      .catch((err) => {
-        console.error('Failed to load duplicates:', err);
-      })
-      .finally(() => setLoading(false));
+  const fetchGroups = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.get<string[][]>('/api/duplicates');
+      setGroups(res.data);
+    } catch (err: any) {
+      console.error('Failed to fetch duplicates', err);
+      setError(err.response?.data?.error || err.message);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  return { groups, loading };
+  useEffect(() => {
+    fetchGroups();
+  }, [fetchGroups]);
+
+  return { groups, loading, error, refetch: fetchGroups };
 }
 
