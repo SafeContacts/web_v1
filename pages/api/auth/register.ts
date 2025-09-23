@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcrypt';
 import User   from '../../../models/User';
+import Contact from '../../../models/Contact';
 import { connect } from '../../../lib/mongodb';
 import { signToken } from '../../../src/lib/jwt';
 import { setRefreshToken } from '../../../src/lib/cookies';

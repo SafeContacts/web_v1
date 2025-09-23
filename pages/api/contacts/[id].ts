@@ -28,8 +28,7 @@ export default async function handler(
       //const temp_id = '68c2d1ccec0a4e7c223ddae9'
       const c = await Contact.findByIdAndUpdate(id, updates, { new: true }).lean()
       
-      const filter = { contactId: id };
-
+      //const filter = { contactId: id };
       // The result of `findOneAndUpdate()` is the document _before_ `update` was applied
       //const c = await Contact.findOneAndUpdate(filter, updates);
 
