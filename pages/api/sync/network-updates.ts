@@ -6,6 +6,8 @@ import { connect }          from '../../../lib/mongodb';
 import SyncSnapshot         from '../../../models/SyncSnapshot';
 import UpdateEvent          from '../../../models/UpdateEvent';
 import TrustEdge            from '../../../models/TrustEdge';
+import UserActivity         from '../../../models/UserActivity';
+import { Server as IOServer } from 'socket.io';
 
 export default requireAuth(async (req, res) => {
   await connect();
@@ -47,7 +49,10 @@ export default requireAuth(async (req, res) => {
     }));
     return { phone:contactPhone, field, suggestions };
   }));
-
+ 
+  // after applying the network update
+//  const io = (res.socket.server as any).io as IOServer;
+ // io.to(userId).emit('network:update', { userId, field, newValue });
   res.json(result);
 });
 

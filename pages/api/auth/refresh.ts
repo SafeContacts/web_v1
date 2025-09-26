@@ -13,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const payload = verifyToken(token);
     const user = await User.findById(payload.sub);
     if (!user) throw new Error();
-    const accessToken  = signToken({ sub: user._id, role: user.role }, '4h');
+    const accessToken  = signToken({ sub: user._id, role: user.role }, '2d');
     const refreshToken = signToken({ sub: user._id }, '7d');
     setRefreshToken(res, refreshToken);
     res.status(200).json({ accessToken });

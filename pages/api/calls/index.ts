@@ -2,6 +2,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { connect } from '../../../lib/mongodb';
 import CallLog     from '../../../models/CallLog';
+import { Contact } from '../../../models/Contact';
+import { computeConfidenceScore } from '../../../lib/confidenceScore';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   await connect();
@@ -13,8 +15,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return;
     }
     const log = await CallLog.create({ contactId, phone, outgoing });
-    res.status(201).json(log);
-    return;
+    const log = await CallLog.create({ userId, contactId, phoneNumber, type, timestamp: new Date() });
+    // Recompute the trust score for the contact if a contactId is provided.
+    // The trust score is stored on the contact document for quick access.
+    if (contactId) {
+	    try {
+		    const newScore = await computeConfidenceScore(contactId as string, userId);
+		    await Contact.findByIdAndUpdate(contactId, { trustScore: newScore });
+	    } catch (err) {
+		    console.error('Failed to update trust score after call log', err);
+	    }
+    }
+      return res.status(201).json(log);
   }
 
   if (req.method === 'GET') {

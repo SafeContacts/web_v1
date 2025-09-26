@@ -30,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
      },
      { upsert: true, setDefaultsOnInsert: true }
   );
-  const accessToken  = signToken({ sub: user._id, role: user.role }, '4h');
+  const accessToken  = signToken({ sub: user._id, role: user.role }, '2d');
   const refreshToken = signToken({ sub: user._id }, '7d');
   setRefreshToken(res, refreshToken);
   res.status(201).json({ accessToken });

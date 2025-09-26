@@ -1,75 +1,98 @@
-import { useEffect, useState } from 'react';
+import React from 'react';
 import {
-  Box, Heading, VStack, Spinner, Alert, AlertIcon,
-  Text, HStack, Badge, Button, useToast
+  Box,
+  Heading,
+  VStack,
+  Spinner,
+  Alert,
+  AlertIcon,
+  Text,
+  HStack,
+  Badge,
+  Button,
+  useToast
 } from '@chakra-ui/react';
-import api from '../src/lib/api';
-
-type Suggestion = {
-  eventId: string;
-  newValue:string;
-  ts:      string;
-  source:  string;
-  trust:   number;
-};
-
-type Group = { phone:string; field:string; suggestions:Suggestion[] };
+import api from '../../src/lib/api';
+import useConflictResolutionViewModel from '../../viewmodels/ConflictResolutionViewModel';
 
 export default function ResolveGroupedPage() {
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState<string|null>(null);
+  const { groups, loading, error, refetch } = useConflictResolutionViewModel();
   const toast = useToast();
 
-  const fetch = async () => {
-    setLoading(true);
+  const applySuggestion = async (phone: string, field: string, s: any) => {
     try {
-      const { data } = await api.get<Group[]>('/api/sync/network-updates');
-      setGroups(data);
-    } catch (err: any) {
-      setError(err.message);
-    } finally { setLoading(false); }
-  };
+      // 1) Lookup contact ID by phone
+      const cRes = await api.get<Array<{ _id: string }>>(
+        `/api/contacts?phone=${encodeURIComponent(phone)}`
+      );
+      if (!cRes.data.length) throw new Error('Contact not found');
+      const contactId = cRes.data[0]._id;
 
-  const apply = async (g:Group, s:Suggestion) => {
-    try {
-      await api.patch('/api/contacts/phone', { // or id mapping
-        phone:g.phone, field:g.field, value:s.newValue
+      // 2) Apply the update
+      await api.patch(`/api/contacts/${contactId}`, { [field]: s.newValue });
+
+      // 3) Log the applied update
+      await api.post(`/api/contacts/${contactId}/update`, {
+        field,
+        oldValue: '',
+        newValue: s.newValue,
+        stealth: false
       });
-      await api.post(`/api/contacts/${g.phone}/update`, {
-        field:g.field, oldValue:'', newValue:s.newValue, stealth:false
-      });
-      toast({status:'success',title:'Applied'});
-      fetch();
+
+      toast({ status: 'success', title: 'Applied update' });
+      refetch();
     } catch (err: any) {
-      toast({status:'error',title:'Failed'});
+      toast({
+        status: 'error',
+        title: 'Failed to apply',
+        description: err.response?.data?.error || err.message
+      });
     }
   };
 
-  useEffect(fetch, []);
-
-  if (loading) return <Spinner />;
-  if (error)   return <Alert status="error"><AlertIcon/>{error}</Alert>;
-  if (groups.length===0) {
-    return <Box p={6}><Heading>No network suggestions</Heading></Box>;
+  if (loading) return <Box p={6} textAlign="center"><Spinner size="xl" /></Box>;
+  if (error)   return <Box p={6}><Alert status="error"><AlertIcon />{error}</Alert></Box>;
+  if (!groups.length) {
+    return <Box p={6}><Heading>No network conflicts.</Heading></Box>;
   }
 
   return (
-    <Box p={6}>
-      <Heading mb={4}>Conflict Resolution</Heading>
+    <Box p={{ base: 4, md: 6 }} bg="background">
+      <Heading mb={4}>Resolve Network Conflicts</Heading>
       <VStack spacing={6} align="stretch">
-        {groups.map((g, i) => (
-          <Box key={i} p={4} borderWidth="1px" borderRadius="md">
-            <Text fontWeight="bold">{g.phone} – <Badge>{g.field}</Badge></Text>
-            {g.suggestions.map(s => (
-              <HStack key={s.eventId} justify="space-between" mt={2}>
-                <Text>{s.newValue}</Text>
-                <HStack>
-                  <Badge>Trust {s.trust}</Badge>
-                  <Button size="sm" onClick={()=>apply(g,s)}>Apply</Button>
+        {groups.map((g, idx) => (
+          <Box
+            key={idx}
+            p={4}
+            bg="surface"
+            borderRadius="md"
+            borderWidth="1px"
+            borderColor="secondary.500"
+          >
+            <HStack mb={2}>
+              <Text fontWeight="bold">Contact:</Text>
+              <Badge colorScheme="secondary">{g.phone}</Badge>
+              <Text fontWeight="bold">Field:</Text>
+              <Badge colorScheme="secondary">{g.field}</Badge>
+            </HStack>
+
+            <VStack spacing={3} align="stretch">
+              {g.suggestions.map((s) => (
+                <HStack key={s.eventId} justify="space-between">
+                  <Text fontSize="md">{s.newValue}</Text>
+                  <HStack>
+                    <Badge colorScheme="accent">Trust: {s.trust}</Badge>
+                    <Button
+                      size="sm"
+                      variant="solid"
+                      onClick={() => applySuggestion(g.phone, g.field, s)}
+                    >
+                      Apply
+                    </Button>
+                  </HStack>
                 </HStack>
-              </HStack>
-            ))}
+              ))}
+            </VStack>
           </Box>
         ))}
       </VStack>

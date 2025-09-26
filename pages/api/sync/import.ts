@@ -3,6 +3,9 @@ import { requireAuth } from '../../../src/middleware/requireAuth';
 import { connect } from '../../../lib/mongodb';
 import SyncSnapshot from '../../../models/SyncSnapshot';
 import SyncDelta    from '../../../models/SyncDelta';
+import UserActivity from '../../../models/UserActivity';
+import { Server as IOServer } from 'socket.io';
+
 
 export default requireAuth(async function handler(req: NextApiRequest, res: NextApiResponse) {
   await connect();
@@ -56,6 +59,11 @@ export default requireAuth(async function handler(req: NextApiRequest, res: Next
   if (deltas.length) {
     await SyncDelta.insertMany(deltas.map(d => ({ ...d, userId })));
   }
+  await UserActivity.create({ userId, type:'import' }); // or 'import', 'apply_network'
+
+  // emit to this user that new deltas arrived
+  const io = (res.socket.server as any).io as IOServer;
+  io.to(userId).emit('sync:import', deltas);
 
   return res.status(200).json(deltas);
 });

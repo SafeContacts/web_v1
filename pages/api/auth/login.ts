@@ -13,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
-  const accessToken  = signToken({ sub: user._id, role: user.role }, '4h');
+  const accessToken  = signToken({ sub: user._id, role: user.role }, '2d');
   const refreshToken = signToken({ sub: user._id }, '7d');
   setRefreshToken(res, refreshToken);
   res.status(200).json({ accessToken });
