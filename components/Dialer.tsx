@@ -83,44 +83,32 @@ export default function Dialer({ contacts = [], userId }: DialerProps) {
   }
 
   return (
-    <div style={{ maxWidth: '400px', margin: '0 auto' }}>
+  <div style={{ maxWidth: '400px', margin: '0 auto' }}>
       <input type="tel" value={number} readOnly style={{ width: '100%', padding: '0.5rem', fontSize: '1.5rem', textAlign: 'center', marginBottom: '1rem' }} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
         {[...Array(9)].map((_, idx) => (
-          <button key={idx + 1} onClick={() => addDigit((idx  1).toString())}
+          <button key={idx + 1} onClick={() => addDigit((idx + 1).toString())}
             style={{ padding: '1rem', fontSize: '1.5rem' }}>
             {idx + 1}
           </button>
         ))}
         <button onClick={deleteDigit} style={{ padding: '1rem', fontSize: '1.5rem' }}>⌫</button>
         <button onClick={() => addDigit('0')} style={{ padding: '1rem', fontSize: '1.5rem' }}>0</button>
-        <a
-          href={normalized ? `tel:${normalized}` : '#'}
-          onClick={handleCallClick}
-          style={{
-            display: 'inline-block',
-            padding: '1rem',
-            fontSize: '1.5rem',
-            textAlign: 'center',
-            backgroundColor: '#4caf50',
-            color: '#fff',
-            textDecoration: 'none',
-          }}
-        >
+        <a href={normalized ? `tel:${normalized}` : '#'} onClick={handleCallClick} style={{
+            display: 'inline-block', padding: '1rem', fontSize: '1.5rem', textAlign: 'center',
+            backgroundColor: '#4caf50', color: '#fff', textDecoration: 'none', }} >
           Call
         </a>
-      </div>
+	</div>
       {normalized && results.length > 0 && (
         <div style={{ marginTop: '1rem' }}>
           <h4>Matching Contacts</h4>
           {results.map((c) => (
-            <div key={c._id} style={{ padding: '0.5rem 0' }}>
-              {c.name} – {c.phones[0]?.value}
-            </div>
+            <div key={c._id} style={{ padding: '0.5rem 0' }}> {c.name} – {c.phones[0]?.value} </div>
           ))}
         </div>
       )}
-    </div>
-  );
+  </div>
+    );
 }
 
