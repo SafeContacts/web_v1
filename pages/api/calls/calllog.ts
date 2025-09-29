@@ -1,18 +1,18 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToDatabase } from '../../../lib/db';
+import { connect } from '../../../lib/mongodb';
 import { CallLog } from '../../../models/CallLog';
 import { Contact } from '../../../models/Contact';
 // Import the advanced confidence score calculator to incorporate additional signals.
 import { computeAdvancedConfidenceScore } from '../../../lib/confidenceScore';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  await connectToDatabase();
+  await connect();
   const { method } = req;
   switch (method) {
     case 'GET': {
       const { userId, limit = '50' } = req.query;
       if (!userId || Array.isArray(userId)) {
-        return res.status(400).json({ error: 'userId is required' });
+        return res.status(400).json({ error: 'userId is required', req: req.query });
       }
       const logs = await CallLog.find({ userId })
         .sort({ timestamp: -1 })
@@ -25,6 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!userId || !phoneNumber || !type) {
         return res.status(400).json({ error: 'userId, phoneNumber and type are required' });
       }
+      // Normalize duration: ensure it's a positive number; default to 0 if missing or invalid.
       const callDuration = typeof duration === 'number' && duration > 0 ? duration : 0;
       const log = await CallLog.create({ userId, contactId, phoneNumber, type, duration: callDuration, timestamp: new Date() });
       // Recompute the trust score for the contact if a contactId is provided.

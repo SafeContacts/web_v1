@@ -1,5 +1,16 @@
 import { Schema, model, models, Document } from 'mongoose';
 
+
+const HandleSchema = new Schema({
+platform: { type: String, enum: ['whatsapp','telegram','instagram','x','linkedin','messenger'], index: true },
+value: { type: String, index: true },
+verified: { type: Boolean, default: false },
+verification_method: { type: String },
+last_checked_at: { type: Date },
+consent_collected: { type: Boolean, default: false },
+metadata: { type: Schema.Types.Mixed },
+}, {_id: false});
+
 export interface IContact extends Document {
   phone:           string;
   name:            string;

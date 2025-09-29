@@ -19,7 +19,10 @@ export default async function handler(
   contacts.forEach((c) => {
     const key = c.phone.replace(/\D/g, '');
     map[key] = map[key] || [];
-    map[key].push(c._id.toString());
+    //map[key].push(c._id.toString());
+    map[key].push(c.name.toString());
+    map[key].push(c.phone.toString());
+    map[key].push(c.email.toString());
   });
 
   // Only keep groups with more than 1 entry
@@ -27,4 +30,4 @@ export default async function handler(
   res.status(200).json(groups);
 }
 
-export default requireAuth(handler, ['user','admin']);
+//export default requireAuth(handler, ['user','admin']);

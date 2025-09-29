@@ -1,17 +1,7 @@
 // pages/duplicates.tsx
 import { useState } from 'react';
 import api from '../src/lib/api';
-import {
-  Box,
-  Heading,
-  VStack,
-  Text,
-  Button,
-  Spinner,
-  Alert,
-  AlertIcon,
-  useToast
-} from '@chakra-ui/react';
+import { Box, Heading, VStack, Text, Button, Spinner, Alert, AlertIcon, useToast } from '@chakra-ui/react';
 import useDuplicateViewModel from '../viewmodels/DuplicateViewModel';
 
 export default function DuplicatesPage() {
@@ -60,26 +50,16 @@ export default function DuplicatesPage() {
 
   return (
     <Box p={6}>
-      <Heading mb={4}>Duplicate Contact Groups</Heading>
+      <Heading mb={4}>Duplicate Contacts Groups</Heading>
       <VStack spacing={6} align="stretch">
         {groups.map((grp, idx) => (
-          <Box
-            key={idx}
-            p={4}
-            borderWidth="1px"
-            borderRadius="md"
-            bg="gray.50"
-          >
+          <Box key={idx} p={4} borderWidth="1px" borderRadius="md" bg="gray.50" >
             <Text mb={2} fontWeight="bold">Group {idx + 1}</Text>
             <VStack align="start" spacing={1} mb={4}>
               {grp.map(id => <Text key={id}>{id}</Text>)}
             </VStack>
-            <Button
-              colorScheme="blue"
-              size="sm"
-              onClick={() => mergeGroup(grp)}
-            >
-              Merge Group
+	    <Button colorScheme="blue" size="sm" onClick={() => mergeGroup(grp)} >
+              Merge 
             </Button>
           </Box>
         ))}

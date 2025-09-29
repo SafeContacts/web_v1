@@ -1,7 +1,7 @@
 // pages/api/calls/index.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { connect } from '../../../lib/mongodb';
-import CallLog     from '../../../models/CallLog';
+import { CallLog }    from '../../../models/CallLog';
 import { Contact } from '../../../models/Contact';
 import { computeConfidenceScore } from '../../../lib/confidenceScore';
 
@@ -14,7 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.status(400).json({ error: 'phone is required' });
       return;
     }
-    const log = await CallLog.create({ contactId, phone, outgoing });
+   //const log = await CallLog.create({ contactId, phone, outgoing });
     const log = await CallLog.create({ userId, contactId, phoneNumber, type, timestamp: new Date() });
     // Recompute the trust score for the contact if a contactId is provided.
     // The trust score is stored on the contact document for quick access.
