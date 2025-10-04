@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { connect }             from '../../../../lib/mongodb';
-import CallLog                  from '../../../../models/CallLog';
+import { CallLog }             from '../../../../models/CallLog';
 
 export default async function handler(_: NextApiRequest, res: NextApiResponse) {
   await connect();

@@ -1,14 +1,7 @@
 // pages/messages.tsx
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import {
-  Box,
-  Heading,
-  VStack,
-  Spinner,
-  Alert,
-  AlertIcon
-} from '@chakra-ui/react';
+import { Box, Heading, VStack, Spinner, Alert, AlertIcon } from '@chakra-ui/react';
 import MessageLogCard, { MessageLog } from '../components/MessageLogCard';
 
 export default function MessagesPage() {

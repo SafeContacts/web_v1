@@ -39,5 +39,6 @@ const ContactSchema = new Schema<IContact>({
   userRef:         { type: Schema.Types.ObjectId, ref: 'User' }
 });
 
-export default models.Contact || model<IContact>('Contact', ContactSchema);
+//export default models.Contact || model<IContact>('Contact', ContactSchema);
+export const Contact: Model<IContact> = models.Contact || model<IContact>('Contact', ContactSchema);
 

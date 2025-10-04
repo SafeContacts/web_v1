@@ -1,89 +1,110 @@
+/*** File: safecontacts/pages/api/sync/index.ts */
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { requireAuth }      from '../../../src/middleware/requireAuth';
-import { connect }          from '../../../lib/mongodb';
-import Contact              from '../../../models/Contact';
-import SyncSnapshot         from '../../../models/SyncSnapshot';
-import UpdateEvent          from '../../../models/UpdateEvent';
+import { connectToDatabase } from '../../../lib/db';
+import { Contact } from '../../../models/Contact';
+import { UpdateEvent } from '../../../models/UpdateEvent';
+import { SyncSnapshot } from '../../../models/SyncSnapshot';
+import { requireAuth } from '../../../lib/auth';
 
 /**
- * Sync API
- *
- * This endpoint accepts an array of contacts from the client (device) and computes
- * differences against the server-side contact list. For existing contacts, it logs
- * stealth UpdateEvent documents whenever a tracked field changes. For new contacts it
- * creates a Contact document. The raw contacts are stored in a SyncSnapshot per-user.
+ * Sync endpoint for device contacts.  Clients should POST a JSON payload with
+ * the user's contact list (names, phone numbers, emails, addresses, etc.).  The
+ * server will compare the incoming list against the last saved snapshot for
+ * that user, update or insert Contact documents as needed, record update
+ * events for changed fields, and persist the new snapshot.  The response
+ * includes counts of inserted and updated contacts.
  */
-export default requireAuth(async function handler(req: NextApiRequest, res: NextApiResponse) {
-  await connect();
-  const { sub: userId } = (req as any).user;
-
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
-    return res.status(405).end(`Method ${req.method} Not Allowed`);
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  await connectToDatabase();
+  const { method } = req;
+  if (method !== 'POST') {
+    return res.setHeader('Allow', ['POST']).status(405).end(`Method ${method} Not Allowed`);
   }
-
-  const { contacts } = req.body as { contacts: any[] };
-  if (!Array.isArray(contacts)) {
-    return res.status(400).json({ error: 'Expected contacts to be an array' });
+  let authUserId: string | undefined;
+  try {
+    await requireAuth(req, res);
+    authUserId = (req as any).user?.sub;
+  } catch (err) {
+    // no auth; continue
   }
-
-  // Fetch or create a snapshot for this user
-  let snapshot = await SyncSnapshot.findOne({ userId });
-  if (!snapshot) {
-    snapshot = await SyncSnapshot.create({ userId, contacts: [] });
+  const { contacts: incomingContacts, userId: bodyUserId } = req.body;
+  const userId: string | undefined = authUserId || bodyUserId;
+  if (!userId || !Array.isArray(incomingContacts)) {
+    return res.status(400).json({ error: 'userId and contacts array are required' });
   }
-
-  let updatesCount = 0;
-
-  for (const incoming of contacts) {
-    const { phone, name, email, company, address, jobTitle, birthday } = incoming || {};
-    if (!phone) {
-      // Skip entries without a phone; phone is our primary key
+  // Fetch existing contacts for this user
+  const existingContacts = await Contact.find({ userId }).lean();
+  // Build a map of normalized primary phone -> existing contact
+  const existingMap: Record<string, any> = {};
+  existingContacts.forEach((c) => {
+    const phone = c.phones?.[0]?.value;
+    if (phone) {
+      const normalized = phone.replace(/\D/g, '');
+      if (normalized) existingMap[normalized] = c;
+    }
+  });
+  let inserted = 0;
+  let updated = 0;
+  const snapshotContacts: any[] = [];
+  for (const rawContact of incomingContacts) {
+    const { name, phones = [], emails = [], addresses = [], notes } = rawContact;
+    const primaryPhoneObj = phones[0];
+    const normalized = primaryPhoneObj?.value ? String(primaryPhoneObj.value).replace(/\D/g, '') : '';
+    const sanitizedPhones = phones.map((p: any) => ({ label: p.label || '', value: String(p.value) }));
+    const sanitizedEmails = emails.map((e: any) => ({ label: e.label || '', value: String(e.value) }));
+    const sanitizedAddresses = addresses.map((a: any) => ({ label: a.label || '', value: String(a.value) }));
+    const snapshotObj = { name, phones: sanitizedPhones, emails: sanitizedEmails, addresses: sanitizedAddresses, notes: notes || '' };
+    snapshotContacts.push(snapshotObj);
+    if (!normalized) {
       continue;
     }
-    const existing = await Contact.findOne({ phone }).lean();
+    const existing = existingMap[normalized];
     if (existing) {
-      // Compare each tracked field and log stealth events when values change
-      const fields: { key: string; newVal: any; oldVal: any }[] = [
-        { key: 'name',     newVal: name,    oldVal: existing.name },
-        { key: 'email',    newVal: email,   oldVal: existing.email },
-        { key: 'company',  newVal: company, oldVal: existing.company },
-        { key: 'address',  newVal: address, oldVal: existing.address },
-        { key: 'jobTitle', newVal: jobTitle, oldVal: existing.jobTitle },
-        { key: 'birthday', newVal: birthday, oldVal: existing.birthday },
-      ];
-      for (const f of fields) {
-        if (f.newVal != null && f.newVal !== f.oldVal) {
-          await UpdateEvent.create({
-            contactId: existing._id,
-            field: f.key,
-            oldValue: f.oldVal ?? '',
-            newValue: f.newVal,
-            stealth: true,
-          });
-          updatesCount;
-        }
+      const updates: any = {};
+      if (existing.name !== name && name) {
+        updates.name = name;
+        await UpdateEvent.create({ contactId: existing._id, userId, field: 'name', oldValue: existing.name, newValue: name });
+      }
+      const existingPrimaryPhone = existing.phones?.[0]?.value;
+      if (existingPrimaryPhone && existingPrimaryPhone.replace(/\D/g, '') !== normalized) {
+        updates.phones = sanitizedPhones;
+        await UpdateEvent.create({ contactId: existing._id, userId, field: 'phones', oldValue: existing.phones, newValue: sanitizedPhones });
+      }
+      if (JSON.stringify(existing.emails || []) !== JSON.stringify(sanitizedEmails)) {
+        updates.emails = sanitizedEmails;
+        await UpdateEvent.create({ contactId: existing._id, userId, field: 'emails', oldValue: existing.emails, newValue: sanitizedEmails });
+      }
+      if (JSON.stringify(existing.addresses || []) !== JSON.stringify(sanitizedAddresses)) {
+        updates.addresses = sanitizedAddresses;
+        await UpdateEvent.create({ contactId: existing._id, userId, field: 'addresses', oldValue: existing.addresses, newValue: sanitizedAddresses });
+      }
+      if ((existing.notes || '') !== (notes || '')) {
+        updates.notes = notes || '';
+        await UpdateEvent.create({ contactId: existing._id, userId, field: 'notes', oldValue: existing.notes, newValue: notes || '' });
+      }
+      if (Object.keys(updates).length > 0) {
+        updated++;
+        await Contact.findByIdAndUpdate(existing._id, updates);
       }
     } else {
-      // If contact doesn't exist, create it with a reference to this user
+      inserted++;
       await Contact.create({
-        phone,
-        name:     name || '',
-        email:    email || '',
-        company:  company || '',
-        address:  address || '',
-        jobTitle: jobTitle || '',
-        birthday: birthday ? new Date(birthday) : undefined,
-        userRef:  userId,
+        userId,
+        name: name || '(unknown)',
+        phones: sanitizedPhones,
+        emails: sanitizedEmails,
+        addresses: sanitizedAddresses,
+        notes: notes || '',
+        trustScore: 0,
       });
     }
   }
+  await SyncSnapshot.findOneAndUpdate(
+    { userId },
+    { contacts: snapshotContacts },
+    { upsert: true, setDefaultsOnInsert: true }
+  );
+  return res.status(200).json({ inserted, updated, count: incomingContacts.length });
+}
 
-  // Replace the user's snapshot with the new contacts list and update timestamp
-  snapshot.contacts = contacts;
-  snapshot.updatedAt = new Date();
-  await snapshot.save();
-
-  return res.status(200).json({ message: 'Sync completed', updates: updatesCount });
-});
 

@@ -2,7 +2,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { connect }             from '../../../lib/mongodb'
-import Contact                 from '../../../models/Contact'
+import { Contact }             from '../../../models/Contact'
 
 export default async function handler(
   req: NextApiRequest,

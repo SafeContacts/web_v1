@@ -1,44 +1,41 @@
-import { useEffect, useState } from 'react';
-import axios from 'axios';
-import { Box, Heading, Spinner, Alert, AlertIcon, Input, Button, VStack } from '@chakra-ui/react';
-import NetworkGraph from '../components/NetworkGraph';
+/*** File: pages/network.tsx */
+import { useState, useEffect } from 'react';
+import { Box, Heading, VStack, Text } from '@chakra-ui/react';
+import api from '../src/lib/api';
 
-export default function NetworkPage() {
-  const [userId, setUserId] = useState('');
-  const [data, setData]     = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState<string|null>(null);
+type Graph = {
+  nodes: { id: string }[];
+  edges: { source: string; target: string }[];
+};
 
-  const fetchGraph = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await axios.get('/api/network', { params: { userId } });
-      setData(res.data);
-    } catch (err) {
-      console.error(err);
-      setError('Failed to load network');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+export default function Network() {
+  const [graph, setGraph] = useState<Graph | null>(null);
+  useEffect(() => {
+    api.get('/api/network/graph')
+      .then(res => setGraph(res.data))
+      .catch(err => console.error('Failed to fetch graph', err));
+  }, []);
   return (
     <Box p={6}>
-      <Heading mb={4}>User Network Graph</Heading>
-      <VStack mb={4}>
-        <Input
-          placeholder="Enter User ID"
-          value={userId}
-          onChange={e=>setUserId(e.target.value)}
-        />
-        <Button onClick={fetchGraph}>Load Graph</Button>
-      </VStack>
-
-      {loading && <Spinner size="xl" />}
-      {error && <Alert status="error"><AlertIcon />{error}</Alert>}
-      {data && <NetworkGraph data={data} />}
+      <Heading mb={4}>Trust Network</Heading>
+      {graph ? (
+        <>
+          <Heading size="md" mb={2}>Nodes</Heading>
+          <VStack align="start" spacing={1}>
+            {graph.nodes.map(node => (
+              <Text key={node.id}>{node.id}</Text>
+            ))}
+          </VStack>
+          <Heading size="md" mt={4} mb={2}>Edges</Heading>
+          <VStack align="start" spacing={1}>
+            {graph.edges.map((edge, idx) => (
+              <Text key={idx}>{edge.source} → {edge.target}</Text>
+            ))}
+          </VStack>
+        </>
+      ) : (
+        <Text>Loading...</Text>
+      )}
     </Box>
   );
 }
-

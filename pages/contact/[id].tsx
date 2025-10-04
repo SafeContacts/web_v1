@@ -1,31 +1,18 @@
-
-// pages/contact/[id].tsx
+/*** File: pages/contact/[id].tsx */
 
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import TrustButton from '../../components/TrustButton';
-
-import axios from 'axios';
+import api from '../../src/lib/api';
+import ContactCard from '../../components/ContactCard';
 import {
   Box,
-  Heading,
-  Text,
-  Badge,
   VStack,
   Button,
+  Text,
   Spinner,
   Alert,
   AlertIcon
 } from '@chakra-ui/react';
-
-type Contact = {
-  _id: string;
-  name: string;
-  phone: string;
-  email?: string;
-  company?: string;
-  confidenceScore: number;
-};
 
 type EnrichmentSuggestion = {
   field: string;
@@ -37,24 +24,36 @@ export default function ContactDetail() {
   const router = useRouter();
   const { id } = router.query as { id?: string };
 
-  const [contact, setContact] = useState<Contact | null>(null);
+  const [contact, setContact] = useState<any | null>(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
 
   const [suggestions, setSuggestions] = useState<EnrichmentSuggestion[]>([]);
   const [enriching, setEnriching]     = useState(false);
 
-  // Fetch contact on mount / id change
+  const [userId, setUserId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    // decode userId from token in localStorage
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setUserId(payload.sub);
+      } catch {}
+    }
+  }, []);
+
   useEffect(() => {
     if (!router.isReady || !id) return;
 
     setLoading(true);
     setError(null);
 
-    axios.get<Contact>(`/api/contacts/${id}`)
+    api.get(`/api/contacts/${id}`)
       .then(res => setContact(res.data))
       .catch(err => {
-        if (axios.isAxiosError(err) && err.response?.status === 404) {
+        if (err.response?.status === 404) {
           setError('Contact not found.');
         } else {
           setError('Failed to load contact.');
@@ -66,7 +65,7 @@ export default function ContactDetail() {
   const fetchEnrichment = async () => {
     if (!id) return;
     try {
-      const res = await axios.get<EnrichmentSuggestion[]>(`/api/contacts/${id}/enrich`);
+      const res = await api.get<EnrichmentSuggestion[]>(`/api/contacts/${id}/enrich`);
       setSuggestions(res.data);
     } catch (err) {
       console.error('Enrichment fetch failed', err);
@@ -77,12 +76,11 @@ export default function ContactDetail() {
     if (!contact || !id || suggestions.length === 0) return;
     setEnriching(true);
     try {
-      // Build update payload
       const updates = suggestions.reduce<Record<string, string>>((acc, s) => {
         acc[s.field] = s.value;
         return acc;
       }, {});
-      const res = await axios.patch<Contact>(`/api/contacts/${id}`, updates);
+      const res = await api.patch(`/api/contacts/${id}`, updates);
       setContact(res.data);
       setSuggestions([]);
     } catch (err) {
@@ -121,17 +119,8 @@ export default function ContactDetail() {
 
   return (
     <Box p={6}>
-      {/* Contact Info */}
-      <Heading mb={2}>{contact.name}</Heading>
-      <Text mb={1}>{contact.phone}</Text>
-      {contact.email && <Text mb={1}>Email: {contact.email}</Text>}
-      {contact.company && <Text mb={1}>Company: {contact.company}</Text>}
-      <Badge colorScheme="green">Score: {contact.confidenceScore}</Badge>
-      {/* Trust / Connect */}
-      <TrustButton
-	currentUserId="USER_ABC"     // replace with actual logged-in user
-	contactId={contact._id}
-      />
+      {/* Use ContactCard to display contact info with call and sms */}
+      <ContactCard contact={contact} userId={userId} />
 
       {/* Enrichment Section */}
       <VStack align="start" spacing={4} mt={6}>
@@ -157,4 +146,3 @@ export default function ContactDetail() {
     </Box>
   );
 }
-

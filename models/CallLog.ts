@@ -5,7 +5,7 @@ export interface ICallLog extends Document {
    userId: string;
    contactId?: string;
    phoneNumber: string;
-   type: 'incoming' | 'outgoing' | 'missed';
+   type: 'incoming' | 'outgoing' | 'missed' | 'sms';
    /** Duration of the call in seconds. Optional, defaults to 0 if unknown. */
    duration?: number;
    timestamp: Date;
@@ -19,7 +19,8 @@ const CallLogSchema = new Schema<ICallLog>(
     userId: { type: String, required: true, index: true },
     contactId: { type: String },
     phoneNumber: { type: String, required: true },
-    type: { type: String, enum: ['incoming', 'outgoing', 'missed'], required: true },
+    //type: { type: String, enum: ['sms', 'incoming', 'outgoing', 'missed'], required: true },
+    type: { type: String, required: true },
     timestamp: { type: Date, default: Date.now },
     duration: { type: Number, default: 0 },
   },
@@ -27,8 +28,8 @@ const CallLogSchema = new Schema<ICallLog>(
 );
 
 
-//export const CallLog: Model<ICallLog> = models.CallLog || model<ICallLog>('CallLog', CallLogSchema);
+export const CallLog: Model<ICallLog> = models.CallLog || model<ICallLog>('CallLog', CallLogSchema);
 
-export default models.CallLog || model('CallLog', CallLogSchema);
+//export default models.CallLog || model('CallLog', CallLogSchema);
 
 

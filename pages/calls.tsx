@@ -1,6 +1,6 @@
-// pages/calls.tsx
+//File:: pages/calls.tsx
 import { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../src/lib/api';
 import { Box, Heading, VStack, Spinner, Alert, AlertIcon } from '@chakra-ui/react';
 import CallLogCard, { CallLog } from '../components/CallLogCard';
 
@@ -10,13 +10,16 @@ export default function CallsPage() {
   const [error, setError]     = useState<string|null>(null);
 
   useEffect(() => {
-    axios.get<CallLog[]>('/api/calls/calllog')
-      .then(res => setLogs(res.data))
-      .catch(err => { console.error(err);
+    api
+      .get<CallLog[]>('/api/calls/calllog')
+      .then((res) => setLogs(res.data))
+      .catch((err) => {
+        console.error(err);
         setError('Failed to load call logs.');
       })
       .finally(() => setLoading(false));
   }, []);
+
 
   if (loading) {
     return (

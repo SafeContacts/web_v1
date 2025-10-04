@@ -1,5 +1,5 @@
 //** File: safecontacts/lib/confidenceScore.ts
-import { TrustEdge } from '../models/TrustEdge';
+import TrustEdge from '../models/TrustEdge';
 import { CallLog } from '../models/CallLog';
 import { Contact } from '../models/Contact';
 import { spamNumbers } from './spamList';
@@ -32,7 +32,7 @@ export async function computeAdvancedConfidenceScore(
   // Determine spam penalty by looking up the contact's primary phone number.
   let spamPenalty = 0;
   try {
-    const contact = await Contact.findOne({ userId: contactUserId }).lean();
+    const contact = await Contact.findById(contactUserId).lean();
     const primaryPhone = contact?.phones?.[0]?.value?.replace(/\D/g, '');
     if (primaryPhone && spamNumbers.has(primaryPhone)) {
       spamPenalty = -30;
