@@ -9,10 +9,12 @@ interface DialerProps {
    */
   contacts?: { _id: string; name: string; phones: { value: string }[] }[];
   /**
-   * The current user's id. Required for logging outgoing calls via the
-   * /api/calllog endpoint. If not provided, calls will not be logged.
+   * The current user's id. Used to match logs to the user. If omitted, logging
+   * will still occur via the authenticated token on the server.
    */
   userId?: string;
+
+
 }
 
 export default function Dialer({ contacts = [], userId }: DialerProps) {

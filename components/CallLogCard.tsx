@@ -14,7 +14,7 @@ const CallLogCard: React.FC<{ log: CallLog }> = ({ log }) => (
   <Box p={3} borderWidth="1px" borderRadius="md" w="100%" bg="gray.50">
     <HStack justify="space-between">
       <Text>
-        {log.outgoing ? '↗' : '↙'} {log.phone}
+        {log.outgoing ? '↗' : '↙'} {log.phoneNumber}
       </Text>
       <Text fontSize="sm" color="gray.500">
         {new Date(log.timestamp).toLocaleString()}

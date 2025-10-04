@@ -1,28 +1,35 @@
 // components/SmsButton.tsx
+
 import React from 'react';
-import axios from 'axios';
 import { IconButton, useToast } from '@chakra-ui/react';
 import { ChatIcon } from '@chakra-ui/icons';
+import api from '../src/lib/api';
 
-export default function SmsButton({
-  contactId,
-  phone
-}: {
+interface SmsButtonProps {
   contactId?: string;
   phone: string;
-}) {
+  userId?: string;
+}
+
+export default function SmsButton({ contactId, phone, userId }: SmsButtonProps) {
   const toast = useToast();
 
   const handleClick = async () => {
+    const normalized = phone.replace(/\D/g, '');
     try {
       // log outgoing SMS
-      await axios.post('/api/messages', { contactId, phone, outgoing: true, message: '' });
+      await api.post('/api/messages', {
+        contactId,
+        phoneNumber: normalized,
+        userId,
+        message: ''
+      });
     } catch (err) {
       console.error('SMS log failed', err);
       toast({ status: 'error', title: 'Could not log SMS' });
     } finally {
       // open SMS app
-      window.location.href = `sms:${phone}`;
+      window.location.href = `sms:${normalized}`;
     }
   };
 
@@ -34,4 +41,3 @@ export default function SmsButton({
     />
   );
 }
-

@@ -1,6 +1,7 @@
 // components/CallButton.tsx
 import React from 'react';
-import axios from 'axios';
+//import axios from 'axios';
+import api from '../src/lib/api';
 import { IconButton, useToast } from '@chakra-ui/react';
 import { PhoneIcon } from '@chakra-ui/icons';
 
@@ -16,7 +17,7 @@ export default function CallButton({
   const handleClick = async () => {
     try {
       // log outgoing call
-      await axios.post('/api/calls', { contactId, phone, outgoing: true });
+      await api.post('/api/calls/calllog', { contactId, phoneNumber: phone, type: 'outgoing' });
     } catch (err) {
       console.error('Call log failed', err);
       toast({ status: 'error', title: 'Could not log call' });
