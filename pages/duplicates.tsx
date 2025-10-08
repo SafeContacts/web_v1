@@ -3,14 +3,58 @@ import { useState, useEffect } from 'react';
 import { Box, Heading, VStack, Text, Button, HStack } from '@chakra-ui/react';
 import api from '../src/lib/api';
 
+
+/**
+ * Decode the user ID from the JWT in localStorage.
+ * If no token is present, fall back to a demo user ID so the page still works.
+ */
+function getCurrentUserId(): string {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return 'demo-user';
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.sub || 'demo-user';
+  } catch {
+    return 'demo-user';
+  }
+}
+
+
 export default function Duplicates() {
+  const [userId, setUserId] = useState<string>('demo-user');
   const [groups, setGroups] = useState<string[][]>([]);
   const [contactsMap, setContactsMap] = useState<Record<string, any>>({});
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api.get('/api/duplicates').then(res => {
       setGroups(res.data);
     });
+
+    // Decode the user ID when the component mounts.
+    const uid = getCurrentUserId();
+    setUserId(uid);
+    async function fetchContacts() {
+      try {
+        setLoading(true);
+        const res = await fetch(`/api/contacts?userId=${uid}`);
+        if (res.ok) {
+          const data = await res.json();
+          setContacts(data);
+        } else {
+          console.error('Failed to fetch contacts', await res.json());
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchContacts();
+  }, []);
+
+/*
     api.get('/api/contacts').then(res => {
       const map: Record<string, any> = {};
       res.data.forEach((c: any) => {
@@ -19,7 +63,7 @@ export default function Duplicates() {
       setContactsMap(map);
     });
   }, []);
-
+*/
   async function merge(group: string[]) {
     await api.post('/api/duplicates/merge', { group });
     const res = await api.get('/api/duplicates');

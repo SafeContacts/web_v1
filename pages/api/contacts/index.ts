@@ -21,14 +21,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let authUserId: string | undefined = undefined;
       try {
         await requireAuth(req, res);
-        authUserId = (req as any).user?.sub;
+        //authUserId = (req as any).user?.sub;
+	const userObj: any = (req as any).user;
+        authUserId = userObj?.sub || userObj?._id;
       } catch (err) {
+	console.log(err)
         // no token provided; proceed with query parameter only
       }
       const { userId } = req.query;
       const targetUserId = typeof userId === 'string' ? userId : authUserId;
       if (!targetUserId) {
-        return res.status(400).json({ error: 'userId is required' });
+        return res.status(400).json({ error: 'userId is required'});
       }
       const contacts = await Contact.find({ userId: targetUserId }).lean();
       return res.status(200).json(contacts);
@@ -42,18 +45,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } catch (err) {
         // no token; we will allow userId in body
       }
-      const { name, phones, emails, addresses, notes, userId: bodyUserId } = req.body;
+
+      // Accept both legacy single phone/email fields and arrays.  If `phones` or
+      // `emails` are not provided, fall back to `phone` or `email`.
+      const { name, phones, phone, emails, email, addresses, notes, userId: bodyUserId, } = req.body;
+
       const ownerId: string | undefined = authUserId || bodyUserId;
       if (!ownerId) {
         return res.status(401).json({ error: 'User must be authenticated or provide userId' });
       }
-      if (!name || !Array.isArray(phones) || phones.length === 0) {
+
+
+      // Build sanitized arrays for phones and emails.  If the array form is
+      // provided, use it; otherwise, fall back to the single value fields.
+      let sanitizedPhones: any[] = [];
+      if (Array.isArray(phones) && phones.length > 0) {
+        sanitizedPhones = phones.map((p: any) => ({ label: p.label || '', value: p.value }));
+      } else if (phone) {
+        sanitizedPhones = [{ label: '', value: phone }];
+      }
+      if (!name || sanitizedPhones.length === 0) {
         return res.status(400).json({ error: 'Name and at least one phone are required' });
       }
-      const sanitizedPhones = phones.map((p: any) => ({ label: p.label || '', value: p.value }));
-      const sanitizedEmails = Array.isArray(emails)
-        ? emails.map((e: any) => ({ label: e.label || '', value: e.value }))
-        : [];
+      let sanitizedEmails: any[] = [];
+      if (Array.isArray(emails) && emails.length > 0) {
+        sanitizedEmails = emails.map((e: any) => ({ label: e.label || '', value: e.value }));
+      } else if (email) {
+        sanitizedEmails = [{ label: '', value: email }];
+      }
       const sanitizedAddresses = Array.isArray(addresses)
         ? addresses.map((a: any) => ({ label: a.label || '', value: a.value }))
         : [];
@@ -65,6 +84,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         addresses: sanitizedAddresses,
         notes: notes || '',
         trustScore: 0,
+        // Also set legacy fields for backward compatibility
+        phone: sanitizedPhones[0]?.value,
+        email: sanitizedEmails[0]?.value,
       });
       return res.status(201).json(contact);
     }

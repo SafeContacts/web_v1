@@ -51,7 +51,8 @@ export default function HomePage() {
   }, []);
 
   return (
-    <Layout>
+    /*<Layout> */
+    <div>
       <h1>My Contacts</h1>
       {/* Show pending update suggestions for this user */}
       <SuggestedUpdatesPanel userId={userId} />
@@ -71,6 +72,7 @@ export default function HomePage() {
       )}
       {/* Show recent call logs for this user */}
       <CallLog userId={userId} />
-    </Layout>
+      </div>
+   /* </Layout> */
   );
 }

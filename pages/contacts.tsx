@@ -1,12 +1,4 @@
-import {
-  Box,
-  Heading,
-  VStack,
-  Spinner,
-  Alert,
-  AlertIcon,
-  Text,
-  Badge
+import { Box, Heading, VStack, Spinner, Alert, AlertIcon, Text, Badge
 } from '@chakra-ui/react';
 import useContactsViewModel from '../viewmodels/ContactsViewModel';
 

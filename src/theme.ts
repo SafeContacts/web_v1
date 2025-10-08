@@ -1,4 +1,3 @@
-// src/theme.ts
 import { extendTheme, ThemeConfig } from '@chakra-ui/react';
 
 const config: ThemeConfig = {
@@ -8,49 +7,59 @@ const config: ThemeConfig = {
 
 const colors = {
   brand: {
-    50: '#e3f2ff',
-    100:'#b3daff',
-    200:'#84c2ff',
-    300:'#55abff',
-    400:'#2693ff',
-    500:'#007bff',
-    600:'#0066cc',
-    700:'#005199',
-    800:'#003c66',
-    900:'#002533',
+    500: '#374151',  // Gray 700
+    600: '#2f3c4a',
+    700: '#26303b',
+  },
+  secondary: {
+    500: '#6B7280',  // Gray 500
+    600: '#5c6671',
+    700: '#4e5963',
   },
   accent: {
-    50: '#e6fffa',
-    100:'#b2f5ea',
-    200:'#81e6d9',
-    300:'#4fd1c5',
-    400:'#38b2ac',
-    500:'#319795',
-    600:'#2c7a7b',
-    700:'#285e61',
-    800:'#234e52',
-    900:'#1d4044',
+    500: '#10B981',  // Green 500
+    600: '#0f9d75',
+    700: '#0e8c67',
+  },
+  background: '#F9FAFB',  // off-white
+  surface:    '#FFFFFF',
+  text: {
+    900: '#111827',
+    50:  '#1F2937'
   }
 };
 
 const fonts = {
-  heading: `'Montserrat', sans-serif`,
-  body:    `'Inter', sans-serif`,
+  heading: `'Poppins', sans-serif`,
+  body:    `'Roboto', sans-serif`
 };
 
 const fontSizes = {
-  sm:  '0.875rem',
-  md:  '1rem',
-  lg:  '1.125rem',
-  xl:  '1.25rem',
-  '2xl':'1.5rem',
-  '3xl':'1.875rem',
+  sm: '0.875rem',
+  md: '1rem',
+  lg: '1.125rem',
+  xl: '1.25rem',
+  '2xl': '1.5rem',
+  '3xl': '1.875rem'
 };
 
 export const theme = extendTheme({
   config,
   colors,
   fonts,
-  fontSizes
+  fontSizes,
+  components: {
+    Button: {
+      variants: {
+        solid: (props: any) => ({
+          bg: props.colorMode === 'light' ? 'brand.500' : 'brand.600',
+          color: 'white',
+          _hover: {
+            bg: props.colorMode === 'light' ? 'brand.600' : 'brand.700'
+          }
+        })
+      }
+    }
+  }
 });
 

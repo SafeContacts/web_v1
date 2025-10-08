@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { requireAuth } from '../../../src/middleware/requireAuth';
 import { connect } from '../../../lib/mongodb';
-import SyncSnapshot from '../../../models/SyncSnapshot';
+import { SyncSnapshot } from '../../../models/SyncSnapshot';
 import SyncDelta    from '../../../models/SyncDelta';
 import UserActivity from '../../../models/UserActivity';
 import { Server as IOServer } from 'socket.io';

@@ -25,11 +25,11 @@ export default function DialerPage() {
     fetchContacts();
   }, [userId]);
   return (
-    <Layout>
+    <div>
       <h1>Dialer</h1>
       {/* Pass userId to the Dialer so it can log outgoing calls */}
       <Dialer contacts={contacts} userId={userId} />
-    </Layout>
+    </div>
   );
 }
 

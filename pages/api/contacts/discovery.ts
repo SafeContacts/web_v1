@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { connect } from '../../../lib/mongodb';
 //import User from '../../../models/User';
-import Contact from '../../../models/Contact';
+import { Contact } from '../../../models/Contact';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   await connect();

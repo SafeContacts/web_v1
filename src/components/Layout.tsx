@@ -1,15 +1,6 @@
 // src/components/Layout.tsx
 import React, { ReactNode } from 'react';
-import {
-  Flex,
-  IconButton,
-  HStack,
-  Text,
-  Box,
-  useColorMode,
-  useColorModeValue,
-  Link as ChakraLink,
-} from '@chakra-ui/react';
+import { Flex, IconButton, HStack, Text, Box, useColorMode, useColorModeValue, Link as ChakraLink, } from '@chakra-ui/react';
 import { SunIcon, MoonIcon, HamburgerIcon } from '@chakra-ui/icons';
 import NextLink from 'next/link';
 
@@ -77,13 +68,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       </Flex>
 
       {/* Footer */}
-      <Flex
-        as="footer"
-        bg={bgHeader}
-        py={4}
-        justify="center"
-        borderTopWidth="1px"
-      >
+      <Flex as="footer" bg={bgHeader} py={4} justify="center" borderTopWidth="1px" >
         <Text fontSize="sm" color="gray.500">
           © {new Date().getFullYear()} SafeContacts Inc.
         </Text>
