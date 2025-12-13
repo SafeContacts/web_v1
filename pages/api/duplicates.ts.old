@@ -1,0 +1,31 @@
+/** File:: pages/api/duplicates.ts **/
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { connect } from '../../lib/mongodb';
+import Contact from '../../models/Contact';
+import { requireAuth } from '../../src/middleware/requireAuth';
+import { findDuplicateGroups } from '../../lib/duplicate';
+
+// This API returns groups of contact IDs that are potential duplicates for the current user.
+export default requireAuth(
+  async function handler(
+    req: NextApiRequest,
+    res: NextApiResponse<string[][]>
+  ) {
+    await connect();
+    const { method } = req;
+    if (method !== 'GET') {
+      res.setHeader('Allow', ['GET']);
+      return res.status(405).end(`Method ${method} Not Allowed`);
+    }
+    // Allow admin to specify a userId query parameter; fallback to authenticated user.
+    const queryUserId = typeof req.query.userId === 'string' ? req.query.userId : undefined;
+    const authUserId = (req as any).user?.sub;
+    const userId = queryUserId || authUserId;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' } as any);
+    }
+    const groups = await findDuplicateGroups(userId);
+    return res.status(200).json(groups.map((g) => g.contacts));
+  },
+  ['user', 'admin']
+);

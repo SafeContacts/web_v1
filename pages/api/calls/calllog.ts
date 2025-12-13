@@ -1,3 +1,112 @@
+
+*** Add File: pages/api/calllog/index.ts
+import type { NextApiRequest, NextApiResponse } from "next";
+import { withAuth } from "../../../lib/auth";
+import mongoose from "mongoose";
+
+import CallLog from "../../../models/CallLog";
+import ContactAlias from "../../../models/ContactAlias";
+import ContactEdge from "../../../models/ContactEdge";
+import Person from "../../../models/Person";
+import User from "../../../models/User";
+
+/**
+ * Call and SMS logging API.  Records an interaction between the
+ * authenticated user and another person.  This endpoint accepts a
+ * `toAliasId` (preferred) or `toPersonId`, along with a `type` ("call"
+ * or "sms") and an optional `duration` in seconds.  A new CallLog
+ * document is created, the caller's ContactAlias (if present) is
+ * updated with the latest contact timestamp, and the corresponding
+ * ContactEdge weight is incremented.  Only POST is supported.
+ */
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const { method } = req;
+  const user: any = (req as any).user;
+  if (!user?.sub) {
+    return res.status(401).json({ ok: false, code: "UNAUTHORIZED" });
+  }
+  if (method !== "POST") {
+    res.setHeader("Allow", ["POST"]);
+    return res.status(405).end();
+  }
+  try {
+    // Connect to DB if not already connected
+    if (mongoose.connection.readyState === 0) {
+      await mongoose.connect(process.env.MONGODB_URI!, {});
+    }
+    const { toAliasId, toPersonId, type, duration } = req.body || {};
+    if (!type || !["call", "sms"].includes(type)) {
+      return res.status(400).json({ ok: false, code: "VALIDATION_ERROR", message: "Invalid or missing type" });
+    }
+    // Determine the target person
+    let targetPersonId: any;
+    let aliasDoc: any = null;
+    if (toAliasId) {
+      aliasDoc = await ContactAlias.findById(toAliasId);
+      if (!aliasDoc) {
+        return res.status(404).json({ ok: false, code: "NOT_FOUND", message: "Alias not found" });
+      }
+      targetPersonId = aliasDoc.personId;
+    } else if (toPersonId) {
+      const person = await Person.findById(toPersonId);
+      if (!person) {
+        return res.status(404).json({ ok: false, code: "NOT_FOUND", message: "Person not found" });
+      }
+      targetPersonId = toPersonId;
+    } else {
+      return res.status(400).json({ ok: false, code: "VALIDATION_ERROR", message: "toAliasId or toPersonId is required" });
+    }
+    // Find caller's personId
+    const caller = await User.findById(user.sub);
+    if (!caller || !caller.personId) {
+      return res.status(404).json({ ok: false, code: "NOT_FOUND", message: "Person not found for user" });
+    }
+    const fromPersonId = caller.personId;
+    const now = new Date();
+    // Create call log entry
+    const log = await CallLog.create({
+      userId: user.sub,
+      fromPersonId,
+      toPersonId: targetPersonId,
+      type,
+      duration: type === "call" ? Number(duration) || 0 : 0,
+      timestamp: now,
+    });
+    // Update alias's lastContactedAt for the caller if exists
+    if (!aliasDoc) {
+      // Attempt to find alias for this user and person
+      aliasDoc = await ContactAlias.findOne({ userId: user.sub, personId: targetPersonId });
+    }
+    if (aliasDoc) {
+      aliasDoc.lastContactedAt = now;
+      await aliasDoc.save();
+    }
+    // Update contact edge weight and lastContactedAt
+    let edge = await ContactEdge.findOne({ fromPersonId, toPersonId: targetPersonId });
+    if (edge) {
+      edge.weight += 1;
+      edge.lastContactedAt = now;
+      await edge.save();
+    } else {
+      await ContactEdge.create({ fromPersonId, toPersonId: targetPersonId, weight: 1, lastContactedAt: now });
+    }
+    return res.status(201).json({
+      _id: log._id.toString(),
+      type: log.type,
+      duration: log.duration,
+      timestamp: log.timestamp,
+      toPersonId: targetPersonId.toString(),
+    });
+  } catch (err: any) {
+    console.error(err);
+    return res.status(500).json({ ok: false, code: "INTERNAL_ERROR", message: "Failed to create call log" });
+  }
+}
+
+export default withAuth(handler);
+
+/*****************************************************************************************************************
+
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { connect } from '../../../lib/mongodb';
 // Use named imports because the Mongoose models are exported as named constants.
@@ -61,3 +170,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 }
 
 export default requireAuth(handler, ['user', 'admin']);
+*****************************************************************************************************************/

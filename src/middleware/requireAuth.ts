@@ -4,6 +4,7 @@ import { verifyToken } from '../lib/jwt';
 export function requireAuth(handler: NextApiHandler, roles: string[] = []) {
   return async (req: NextApiRequest, res: NextApiResponse) => {
     const auth = req.headers.authorization?.split(' ')[1];
+    //const auth = req.query.sc_refresh?.split(' ')[1];
     if (!auth) return res.status(401).json({ error: 'Missing token' });
     try {
       const payload: any = verifyToken(auth);

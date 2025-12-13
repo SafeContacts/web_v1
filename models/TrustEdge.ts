@@ -1,10 +1,15 @@
-import { Schema, model, models } from 'mongoose';
+import mongoose, { Schema } from "mongoose";
 
-const TrustEdgeSchema = new Schema({
-  fromUser: String,
-  toUser: String,
-  confirmed: { type: Boolean, default: false },
-  createdAt: { type: Date, default: Date.now }
-});
+const TrustEdgeSchema = new Schema(
+  {
+    fromPersonId: { type: Schema.Types.ObjectId, ref: "Person", required: true },
+    toPersonId: { type: Schema.Types.ObjectId, ref: "Person", required: true },
+    level: { type: Number, default: 1 },
+  },
+  { timestamps: true },
+);
 
-export default models.TrustEdge || model('TrustEdge', TrustEdgeSchema);
+TrustEdgeSchema.index({ fromPersonId: 1, toPersonId: 1 }, { unique: true });
+
+export default mongoose.models.TrustEdge || mongoose.model("TrustEdge", TrustEdgeSchema);
+

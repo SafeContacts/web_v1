@@ -1,68 +1,57 @@
-// pages/api/contacts/[id].ts
+/* FILE:: pages/api/contacts/[id].ts */
 
-import type { NextApiRequest, NextApiResponse } from 'next'
+import type { NextApiRequest, NextApiResponse } from "next";
+import mongoose from "mongoose";
+import Contact from "../../../models/Contact";
+import { withAuth } from "../../../lib/auth";
 import { connect }             from '../../../lib/mongodb'
-import { Contact }             from '../../../models/Contact'
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  try {
-    await connect()
-    const { id } = req.query as { id: string }
-
-    if (req.method === 'GET') {
-      const c = await Contact.findById(id).lean()
-      if (!c) {
-        //res.status(404).end()
-	res.status(404).json({ error: 'Contact not found', id : id});
-        return
-      }
-      res.status(200).json(c)
-      return
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const { method } = req;
+  const user: any = (req as any).user;
+  const { id } = req.query as { id: string };
+  if (!user?.sub) {
+    return res.status(401).json({ ok: false, code: "UNAUTHORIZED" });
+  }
+  if (mongoose.connection.readyState === 0) {
+     await connect()
+  }
+  const contact = await Contact.findById(id);
+  if (!contact) {
+    return res.status(404).json({ ok: false, code: "NOT_FOUND" });
+  }
+  if (contact.userId !== user.sub && user.role !== "admin") {
+    return res.status(403).json({ ok: false, code: "FORBIDDEN" });
+  }
+  switch (method) {
+    case "GET": {
+      return res.status(200).json(contact);
     }
-
-    if (req.method === 'PATCH') {
-      const updates = req.body
-      //const temp_id = '68c2d1ccec0a4e7c223ddae9'
-      const c = await Contact.findByIdAndUpdate(id, updates, { new: true }).lean()
-      
-      //const filter = { contactId: id };
-      // The result of `findOneAndUpdate()` is the document _before_ `update` was applied
-      //const c = await Contact.findOneAndUpdate(filter, updates);
-
-      if (!c) {
-        //res.status(404).end()
-	res.status(404).json({ error: 'Contact not found', id : id, updates: updates});
-        return
+    case "PUT": {
+      const allowed = [
+        "name",
+        "phones",
+        "emails",
+        "addresses",
+        "notes",
+        "company",
+        "tags",
+        "linkedIn",
+        "twitter",
+        "instagram",
+      ];
+      for (const key of Object.keys(req.body)) {
+        if (allowed.includes(key)) {
+          (contact as any)[key] = req.body[key];
+        }
       }
-      res.status(200).json(c)
-      return
+      await contact.save();
+      return res.status(200).json(contact);
     }
-
-    // also upsert into global Contact collection
-    await Contact.findOneAndUpdate(
-	{ phone: updated.phone },
-	{
-	   phone: updated.phone,
-	   name:  updated.name,
-	   $setOnInsert: { confidenceScore: 0, tags: [], isRegistered:false }
-	},
-	{ upsert:true }
-    );
-    
-    // And when you log an update event, recalc confidence:
-    const updatedContact = await Contact.findOne({ phone });
-    updatedContact.confidenceScore = calculateNewScore(updatedContact);
-    await updatedContact.save();
-
-
-    // Method not allowed
-    res.setHeader('Allow', ['GET', 'PATCH'])
-    res.status(405).end(`Method ${req.method} Not Allowed`)
-  } catch (error) {
-    console.error('[/api/contacts/[id]]', error)
-    res.status(500).json({ error: 'Internal Server Error' })
+    default:
+      res.setHeader("Allow", ["GET", "PUT"]);
+      return res.status(405).end();
   }
 }
+
+export default withAuth(handler);

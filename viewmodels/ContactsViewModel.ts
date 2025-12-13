@@ -21,7 +21,10 @@ export default function useContactsViewModel() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<UserContact[]>('/api/contacts');
+      //const res = await api.get<UserContact[]>('/api/contacts');
+      const token = localStorage.getItem("accessToken");
+      const res = fetch("/api/contacts", {
+	      headers: { Authorization: `Bearer ${token}` }});
       setContacts(res.data);
     } catch (err: any) {
       console.error('Fetch contacts failed', err);

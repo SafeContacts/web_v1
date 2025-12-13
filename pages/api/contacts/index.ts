@@ -1,97 +1,60 @@
 /*** Add File: safecontacts/pages/api/contacts/index.ts */
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { connect } from '../../../lib/mongodb';
-import { Contact } from '../../../models/Contact';
-import { requireAuth } from '../../../src/middleware/requireAuth';
+import type { NextApiRequest, NextApiResponse } from "next";
+import { withAuth } from "../../../lib/auth";
+import mongoose from "mongoose";
+import Contact from "../../../models/Contact";
 
-/**
- * API route for managing a user's contacts.  Supports GET to fetch contacts
- * and POST to create a new contact.  The userId is derived from the
- * authenticated token if present; admin callers may pass a userId query
- * parameter to fetch another user's contacts.  When creating contacts,
- * callers may provide userId in the request body when no token is present
- * (useful for demonstrations).
- */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  await connect();
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { method } = req;
+  const user: any = (req as any).user;
+  if (!user?.sub) {
+    return res.status(401).json({ ok: false, code: "UNAUTHORIZED" });
+  }
+  if (mongoose.connection.readyState === 0) {
+    await mongoose.connect(process.env.MONGODB_URI!, {});
+  }
   switch (method) {
-    case 'GET': {
-      // Attempt to authenticate; allow admin callers to specify a userId query.
-      let authUserId: string | undefined = undefined;
-      try {
-        await requireAuth(req, res);
-        //authUserId = (req as any).user?.sub;
-	const userObj: any = (req as any).user;
-        authUserId = userObj?.sub || userObj?._id;
-      } catch (err) {
-	console.log(err)
-        // no token provided; proceed with query parameter only
+    case "GET": {
+      const queryUserId = req.query.userId as string | undefined;
+      let userId = user.sub as string;
+      if (queryUserId && queryUserId !== userId) {
+        if (user.role === "admin") {
+          userId = queryUserId;
+        } else {
+          return res.status(403).json({ ok: false, code: "FORBIDDEN", message: "Not authorized to access other users' contacts" });
+        }
       }
-      const { userId } = req.query;
-      const targetUserId = typeof userId === 'string' ? userId : authUserId;
-      if (!targetUserId) {
-        return res.status(400).json({ error: 'userId is required'});
-      }
-      const contacts = await Contact.find({ userId: targetUserId }).lean();
+      const contacts = await Contact.find({ userId }).lean();
       return res.status(200).json(contacts);
     }
-    case 'POST': {
-      // Create a new contact.  Require authentication or explicit userId in body.
-      let authUserId: string | undefined;
+    case "POST": {
+      const { name, phones, emails, addresses, notes, linkedIn, twitter, instagram } = req.body;
+      if (!name || !phones || !Array.isArray(phones) || phones.length === 0) {
+        return res.status(400).json({ ok: false, code: "VALIDATION_ERROR", message: "Name and at least one phone are required", data: req.body });
+      }
       try {
-        await requireAuth(req, res);
-        authUserId = (req as any).user?.sub;
-      } catch (err) {
-        // no token; we will allow userId in body
+        const contact = await Contact.create({
+          userId: user.sub,
+          name,
+          phones,
+          emails: emails || [],
+          addresses: addresses || [],
+          notes: notes || "",
+          trustScore: 0,
+          linkedIn,
+          twitter,
+          instagram,
+        });
+        return res.status(201).json(contact);
+      } catch (err: any) {
+        console.error(err);
+        return res.status(500).json({ ok: false, code: "INTERNAL_ERROR", message: "Failed to create contact" });
       }
-
-      // Accept both legacy single phone/email fields and arrays.  If `phones` or
-      // `emails` are not provided, fall back to `phone` or `email`.
-      const { name, phones, phone, emails, email, addresses, notes, userId: bodyUserId, } = req.body;
-
-      const ownerId: string | undefined = authUserId || bodyUserId;
-      if (!ownerId) {
-        return res.status(401).json({ error: 'User must be authenticated or provide userId' });
-      }
-
-
-      // Build sanitized arrays for phones and emails.  If the array form is
-      // provided, use it; otherwise, fall back to the single value fields.
-      let sanitizedPhones: any[] = [];
-      if (Array.isArray(phones) && phones.length > 0) {
-        sanitizedPhones = phones.map((p: any) => ({ label: p.label || '', value: p.value }));
-      } else if (phone) {
-        sanitizedPhones = [{ label: '', value: phone }];
-      }
-      if (!name || sanitizedPhones.length === 0) {
-        return res.status(400).json({ error: 'Name and at least one phone are required' });
-      }
-      let sanitizedEmails: any[] = [];
-      if (Array.isArray(emails) && emails.length > 0) {
-        sanitizedEmails = emails.map((e: any) => ({ label: e.label || '', value: e.value }));
-      } else if (email) {
-        sanitizedEmails = [{ label: '', value: email }];
-      }
-      const sanitizedAddresses = Array.isArray(addresses)
-        ? addresses.map((a: any) => ({ label: a.label || '', value: a.value }))
-        : [];
-      const contact = await Contact.create({
-        userId: ownerId,
-        name,
-        phones: sanitizedPhones,
-        emails: sanitizedEmails,
-        addresses: sanitizedAddresses,
-        notes: notes || '',
-        trustScore: 0,
-        // Also set legacy fields for backward compatibility
-        phone: sanitizedPhones[0]?.value,
-        email: sanitizedEmails[0]?.value,
-      });
-      return res.status(201).json(contact);
     }
     default:
-      return res.setHeader('Allow', ['GET', 'POST']).status(405).end(`Method ${method} Not Allowed`);
+      res.setHeader("Allow", ["GET", "POST"]);
+      return res.status(405).end(`Method ${method} Not Allowed`);
   }
 }
 
+export default withAuth(handler);

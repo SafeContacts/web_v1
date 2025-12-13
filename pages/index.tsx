@@ -1,78 +1,544 @@
-/*** File: pages/index.tsx */
-import { useEffect, useState } from 'react';
-import Layout from '../components/Layout';
-import ContactCard from '../components/ContactCard';
-import SuggestedUpdatesPanel from '../components/SuggestedUpdatesPanel';
-import CallLog from '../components/CallLog';
-import AddContactForm from '../components/AddContactForm';
+import { useEffect, useState } from "react";
+import Head from "next/head";
+import { useRouter } from "next/router";
+import {
+  Box,
+  Button,
+  Input,
+  InputGroup,
+  InputLeftElement,
+  Grid,
+  GridItem,
+  Card,
+  CardBody,
+  CardHeader,
+  Heading,
+  Text,
+  Badge,
+  HStack,
+  VStack,
+  IconButton,
+  useToast,
+  Spinner,
+  Flex,
+  Stat,
+  StatLabel,
+  StatNumber,
+  StatHelpText,
+  useColorModeValue,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  useDisclosure,
+  FormControl,
+  FormLabel,
+  Progress,
+  Avatar,
+} from "@chakra-ui/react";
+import { SearchIcon, AddIcon, RepeatIcon, PhoneIcon, EmailIcon, BuildingIcon, ViewIcon } from "@chakra-ui/icons";
 
-/**
- * Decode the user ID from the JWT in localStorage.
- * If no token is present, fall back to a demo user ID so the page still works.
- */
-function getCurrentUserId(): string {
-  try {
-    const token = localStorage.getItem('token');
-    if (!token) return 'demo-user';
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.sub || 'demo-user';
-  } catch {
-    return 'demo-user';
-  }
+interface Contact {
+  _id: string;
+  alias: string;
+  tags: string[];
+  notes: string;
+  updatedAt?: string;
+  person?: {
+    _id: string;
+    phones: Array<{ label?: string; value: string; e164?: string }>;
+    emails: Array<{ label?: string; value: string }>;
+    addresses: string[];
+    socials: { linkedIn?: string; twitter?: string; instagram?: string };
+    trustScore?: number;
+  };
 }
 
 export default function HomePage() {
-  const [userId, setUserId] = useState<string>('demo-user');
-  const [contacts, setContacts] = useState<any[]>([]);
+  const router = useRouter();
+  const toast = useToast();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [newAlias, setNewAlias] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  const cardBg = useColorModeValue("white", "gray.800");
+  const borderColor = useColorModeValue("gray.200", "gray.700");
+  const hoverBg = useColorModeValue("gray.50", "gray.700");
+
+  async function loadContacts() {
+    try {
+      setLoading(true);
+      const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+      const resp = await fetch("/api/contacts", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setContacts(data);
+      } else if (resp.status === 401) {
+        router.push("/login");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    // Decode the user ID when the component mounts.
-    const uid = getCurrentUserId();
-    setUserId(uid);
-
-    async function fetchContacts() {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api/contacts?userId=${uid}`);
-        if (res.ok) {
-          const data = await res.json();
-          setContacts(data);
-        } else {
-          console.error('Failed to fetch contacts', await res.json());
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchContacts();
+    loadContacts();
   }, []);
 
+  const total = contacts.length;
+  const verified = contacts.filter((c) => ((c.person?.trustScore ?? 0) >= 80)).length;
+  const pendingSync = 0;
+  const networkUpdates = 0;
+
+  const filtered = contacts.filter((c) => {
+    if (!query) return true;
+    const q = query.toLowerCase();
+    const aliasMatch = c.alias.toLowerCase().includes(q);
+    const phoneMatch = c.person?.phones?.some((p) => p.value.toLowerCase().includes(q)) ?? false;
+    const emailMatch = c.person?.emails?.some((e) => e.value.toLowerCase().includes(q)) ?? false;
+    return aliasMatch || phoneMatch || emailMatch;
+  });
+
+  function getCompany(contact: Contact): string {
+    const email = contact.person?.emails?.[0]?.value;
+    if (!email) return "";
+    const parts = email.split("@");
+    if (parts.length < 2) return "";
+    const domain = parts[1].split(".")[0];
+    return domain.charAt(0).toUpperCase() + domain.slice(1);
+  }
+
+  function formatRelative(dateStr?: string): string {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    const diff = Date.now() - date.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    if (days < 1) return "Today";
+    if (days === 1) return "1 day ago";
+    return `${days} days ago`;
+  }
+
+  async function addContact(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newAlias || (!newPhone && !newEmail)) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a name and at least one phone or email.",
+        status: "warning",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+    setAdding(true);
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+      const payload: any = { name: newAlias };
+      if (newPhone) payload.phones = [{ value: newPhone, label: "mobile" }];
+      if (newEmail) payload.emails = [{ value: newEmail, label: "work" }];
+      const resp = await fetch("/api/contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+      if (resp.ok) {
+        setNewAlias("");
+        setNewPhone("");
+        setNewEmail("");
+        onClose();
+        toast({
+          title: "Success",
+          description: "Contact added successfully!",
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        });
+        await loadContacts();
+      } else if (resp.status === 401) {
+        router.push("/login");
+      } else {
+        const err = await resp.json();
+        toast({
+          title: "Error",
+          description: err.message || "Failed to add contact",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    } catch (ex: any) {
+      toast({
+        title: "Error",
+        description: ex.message || "An unexpected error occurred",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function handleSync() {
+    setSyncing(true);
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+      const resp = await fetch("/api/sync", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (resp.ok) {
+        toast({
+          title: "Sync Complete",
+          description: "Your contacts have been synced successfully.",
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        });
+        await loadContacts();
+      } else {
+        await loadContacts();
+        toast({
+          title: "Contacts Refreshed",
+          description: "Your contacts have been refreshed.",
+          status: "info",
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Sync Error",
+        description: "Failed to sync contacts. Please try again.",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <Flex justify="center" align="center" minH="400px">
+        <VStack spacing={4}>
+          <Spinner size="xl" color="primary.500" thickness="4px" />
+          <Text color="gray.500">Loading contacts...</Text>
+        </VStack>
+      </Flex>
+    );
+  }
+
   return (
-    /*<Layout> */
-    <div>
-      <h1>My Contacts</h1>
-      {/* Show pending update suggestions for this user */}
-      <SuggestedUpdatesPanel userId={userId} />
-      {/* Form to add a new contact. On success, append to local state */}
-      <AddContactForm
-        userId={userId}
-        onCreated={(contact) => setContacts((prev) => [...prev, contact])}
-      />
-      {loading ? (
-        <p>Loading contacts…</p>
-      ) : contacts.length === 0 ? (
-        <p>No contacts found. Sync your device or add a contact above.</p>
+    <Box>
+      <Head>
+        <title>My Contacts - SafeContacts</title>
+      </Head>
+
+      {/* Header Section */}
+      <Flex justify="space-between" align="center" mb={8} flexWrap="wrap" gap={4}>
+        <Box>
+          <Heading size="2xl" fontWeight="bold" mb={2} bgGradient="linear(to-r, primary.600, brand.600)" bgClip="text">
+            My Contacts
+          </Heading>
+          <Text color="gray.500">Manage and organize your contacts</Text>
+        </Box>
+        <HStack spacing={3}>
+          <Button
+            leftIcon={<AddIcon />}
+            variant="outline"
+            onClick={onOpen}
+            size="md"
+          >
+            Add Contact
+          </Button>
+          <Button
+            leftIcon={<RepeatIcon />}
+            onClick={handleSync}
+            isLoading={syncing}
+            loadingText="Syncing"
+            size="md"
+          >
+            Sync Now
+          </Button>
+        </HStack>
+      </Flex>
+
+      {/* Statistics Cards */}
+      <Grid templateColumns={{ base: "repeat(2, 1fr)", md: "repeat(4, 1fr)" }} gap={6} mb={8}>
+        <Card bg={cardBg} borderColor={borderColor} borderWidth="1px">
+          <CardBody>
+            <Stat>
+              <StatLabel color="gray.500" fontSize="sm" fontWeight="medium">
+                Total Contacts
+              </StatLabel>
+              <StatNumber fontSize="3xl" fontWeight="bold" color="primary.600">
+                {total.toLocaleString()}
+              </StatNumber>
+            </Stat>
+          </CardBody>
+        </Card>
+        <Card bg={cardBg} borderColor={borderColor} borderWidth="1px">
+          <CardBody>
+            <Stat>
+              <StatLabel color="gray.500" fontSize="sm" fontWeight="medium">
+                Verified
+              </StatLabel>
+              <StatNumber fontSize="3xl" fontWeight="bold" color="green.500">
+                {verified.toLocaleString()}
+              </StatNumber>
+              <StatHelpText color="gray.400" fontSize="xs">
+                Trust score ≥ 80%
+              </StatHelpText>
+            </Stat>
+          </CardBody>
+        </Card>
+        <Card bg={cardBg} borderColor={borderColor} borderWidth="1px">
+          <CardBody>
+            <Stat>
+              <StatLabel color="gray.500" fontSize="sm" fontWeight="medium">
+                Pending Sync
+              </StatLabel>
+              <StatNumber fontSize="3xl" fontWeight="bold" color="yellow.500">
+                {pendingSync.toLocaleString()}
+              </StatNumber>
+            </Stat>
+          </CardBody>
+        </Card>
+        <Card bg={cardBg} borderColor={borderColor} borderWidth="1px">
+          <CardBody>
+            <Stat>
+              <StatLabel color="gray.500" fontSize="sm" fontWeight="medium">
+                Network Updates
+              </StatLabel>
+              <StatNumber fontSize="3xl" fontWeight="bold" color="brand.500">
+                {networkUpdates.toLocaleString()}
+              </StatNumber>
+            </Stat>
+          </CardBody>
+        </Card>
+      </Grid>
+
+      {/* Search Bar */}
+      <Box mb={6}>
+        <InputGroup size="lg" maxW={{ base: "100%", md: "500px" }}>
+          <InputLeftElement pointerEvents="none">
+            <SearchIcon color="gray.400" />
+          </InputLeftElement>
+          <Input
+            placeholder="Search contacts by name, phone, or email..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            bg={cardBg}
+            borderColor={borderColor}
+          />
+        </InputGroup>
+      </Box>
+
+      {/* Contacts Grid */}
+      {filtered.length === 0 ? (
+        <Card bg={cardBg} borderColor={borderColor} borderWidth="1px">
+          <CardBody>
+            <VStack spacing={4} py={12}>
+              <Text fontSize="xl" color="gray.500" fontWeight="medium">
+                {query ? "No contacts found matching your search" : "No contacts yet"}
+              </Text>
+              {!query && (
+                <Button colorScheme="primary" onClick={onOpen} leftIcon={<AddIcon />}>
+                  Add Your First Contact
+                </Button>
+              )}
+            </VStack>
+          </CardBody>
+        </Card>
       ) : (
-        contacts.map((c) => (
-          <ContactCard key={c._id} contact={c} userId={userId} />
-        ))
+        <Grid templateColumns={{ base: "1fr", md: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }} gap={6}>
+          {filtered.map((c) => {
+            const name = c.alias || "Unnamed";
+            const phones = c.person?.phones || [];
+            const emails = c.person?.emails || [];
+            const phone = phones[0]?.value || "";
+            const email = emails[0]?.value || "";
+            const company = getCompany(c);
+            const score = c.person?.trustScore ?? 0;
+            const scoreColor = score >= 80 ? "green" : score >= 50 ? "yellow" : "red";
+
+            return (
+              <Card
+                key={c._id}
+                bg={cardBg}
+                borderColor={borderColor}
+                borderWidth="1px"
+                _hover={{ shadow: "xl", transform: "translateY(-4px)", borderColor: "primary.300" }}
+                transition="all 0.3s"
+                cursor="pointer"
+                onClick={() => router.push(`/contact/${c._id}`)}
+              >
+                <CardHeader pb={2}>
+                  <Flex justify="space-between" align="start">
+                    <HStack spacing={3}>
+                      <Avatar
+                        name={name}
+                        size="md"
+                        bgGradient="linear(to-br, primary.500, brand.500)"
+                      />
+                      <Box>
+                        <Heading size="md" fontWeight="semibold" noOfLines={1}>
+                          {name}
+                        </Heading>
+                        {company && (
+                          <Text fontSize="sm" color="gray.500" noOfLines={1}>
+                            {company}
+                          </Text>
+                        )}
+                      </Box>
+                    </HStack>
+                    <Badge colorScheme={scoreColor} fontSize="xs" px={2} py={1}>
+                      {score}%
+                    </Badge>
+                  </Flex>
+                </CardHeader>
+                <CardBody pt={0}>
+                  <VStack align="stretch" spacing={3}>
+                    {phone && (
+                      <HStack spacing={2} color="gray.600">
+                        <PhoneIcon w={4} h={4} />
+                        <Text fontSize="sm" noOfLines={1}>
+                          {phone}
+                        </Text>
+                      </HStack>
+                    )}
+                    {email && (
+                      <HStack spacing={2} color="gray.600">
+                        <EmailIcon w={4} h={4} />
+                        <Text fontSize="sm" noOfLines={1}>
+                          {email}
+                        </Text>
+                      </HStack>
+                    )}
+                    {company && (
+                      <HStack spacing={2} color="gray.600">
+                        <BuildingIcon w={4} h={4} />
+                        <Text fontSize="sm" noOfLines={1}>
+                          {company}
+                        </Text>
+                      </HStack>
+                    )}
+                    {c.tags && c.tags.length > 0 && (
+                      <HStack spacing={2} flexWrap="wrap">
+                        {c.tags.slice(0, 3).map((tag) => (
+                          <Badge key={tag} colorScheme="primary" fontSize="xs" px={2} py={1}>
+                            {tag}
+                          </Badge>
+                        ))}
+                        {c.tags.length > 3 && (
+                          <Badge colorScheme="gray" fontSize="xs" px={2} py={1}>
+                            +{c.tags.length - 3}
+                          </Badge>
+                        )}
+                      </HStack>
+                    )}
+                    <Box>
+                      <Text fontSize="xs" color="gray.400" mb={1}>
+                        Trust Score
+                      </Text>
+                      <Progress
+                        value={score}
+                        colorScheme={scoreColor}
+                        size="sm"
+                        borderRadius="full"
+                      />
+                    </Box>
+                    {c.updatedAt && (
+                      <Text fontSize="xs" color="gray.400">
+                        Updated {formatRelative(c.updatedAt)}
+                      </Text>
+                    )}
+                  </VStack>
+                </CardBody>
+              </Card>
+            );
+          })}
+        </Grid>
       )}
-      {/* Show recent call logs for this user */}
-      <CallLog userId={userId} />
-      </div>
-   /* </Layout> */
+
+      {/* Add Contact Modal */}
+      <Modal isOpen={isOpen} onClose={onClose} size="md">
+        <ModalOverlay />
+        <ModalContent>
+          <form onSubmit={addContact}>
+            <ModalHeader>Add New Contact</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <VStack spacing={4}>
+                <FormControl isRequired>
+                  <FormLabel>Name</FormLabel>
+                  <Input
+                    placeholder="Contact name"
+                    value={newAlias}
+                    onChange={(e) => setNewAlias(e.target.value)}
+                  />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Phone</FormLabel>
+                  <Input
+                    type="tel"
+                    placeholder="+1 (555) 123-4567"
+                    value={newPhone}
+                    onChange={(e) => setNewPhone(e.target.value)}
+                  />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Email</FormLabel>
+                  <Input
+                    type="email"
+                    placeholder="contact@example.com"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                  />
+                </FormControl>
+                <Text fontSize="xs" color="gray.500">
+                  At least one phone or email is required
+                </Text>
+              </VStack>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" mr={3} onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit" isLoading={adding} loadingText="Adding">
+                Add Contact
+              </Button>
+            </ModalFooter>
+          </form>
+        </ModalContent>
+      </Modal>
+    </Box>
   );
 }

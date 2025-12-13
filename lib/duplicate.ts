@@ -3,7 +3,9 @@
 // contains two or more contacts with the same phone number or email
 // address, normalized for case and punctuation.
 
-import { Contact }           from '../models/Contact';
+import mongoose from 'mongoose';
+import Contact from '../models/Contact';
+import { connect } from './mongodb';
 import { compareTwoStrings } from './similarity';
 
 export interface DuplicateGroup {
@@ -16,6 +18,10 @@ export interface DuplicateGroup {
  * with only one contact are filtered out.
  */
 export async function findDuplicateGroups(): Promise<DuplicateGroup[]> {
+  // Ensure mongoose connection
+  if (mongoose.connection.readyState === 0) {
+    await connect();
+  }
   const contacts = await Contact.find().lean();
   const phoneMap: Record<string, string[]> = {};
   const emailMap: Record<string, string[]> = {};
@@ -62,6 +68,10 @@ export async function findDuplicateGroups(): Promise<DuplicateGroup[]> {
  */
 export async function mergeDuplicateGroup(group: string[]): Promise<any> {
   if (!Array.isArray(group) || group.length < 2) return;
+  // Ensure mongoose connection
+  if (mongoose.connection.readyState === 0) {
+    await connect();
+  }
   const contacts = await Contact.find({ _id: { $in: group } });
   if (contacts.length < 2) return;
   // Determine the master contact by highest trustScore (fallback to 0)

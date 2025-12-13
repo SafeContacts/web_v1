@@ -1,7 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcrypt';
 import User   from '../../../models/User';
-import Contact from '../../../models/Contact';
+import ContactEdge from '../../../models/ContactEdge';
+import ContactAlias from '../../../models/ContactAlias';
+import Person from '../../../models/Person';
 import { connect } from '../../../lib/mongodb';
 import { signToken } from '../../../src/lib/jwt';
 import { setRefreshToken } from '../../../src/lib/cookies';
@@ -17,8 +19,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(409).json({ error: 'User exists' });
   }
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = await User.create({ phone, name, passwordHash });
-  // Ensure a Contact exists for this phone, mark it “alive”
+
+  // Create a Person record.  We set registeredUserId later once the User is created.
+  const person = await Person.create({
+    phones: [{value: phone}], emails: [{value: phone + '@hidden.safe.local'}],
+  });
+
+  // Create a User referencing the person
+  const user = await User.create({ username:name, personId: person._id, role: "user", phone, passwordHash });
+  // Link the Person back to the user as the registered account.
+  person.registeredUserId = user._id.toString();
+  await person.save();
+  // Create a ContactAlias for the user referring to themselves, so they appear in their own contact list
+  await ContactAlias.create({ userId: user._id.toString(), personId: person._id, alias: name, tags: [], notes: "" });
+  // Also create a ContactEdge from the person's node to themselves to establish a self-link.
+  await ContactEdge.create({ fromPersonId: person._id, toPersonId: person._id, weight: 1 });
+  /* Ensure a Contact exists for this phone, mark it “alive”
   await Contact.findOneAndUpdate(
    { phone },
      {
@@ -30,9 +46,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
      },
      { upsert: true, setDefaultsOnInsert: true }
   );
+  */
   const accessToken  = signToken({ sub: user._id, role: user.role }, '2d');
   const refreshToken = signToken({ sub: user._id }, '7d');
   setRefreshToken(res, refreshToken);
   res.status(201).json({ accessToken });
+/*+    // Generate JWT for the new user
++    const payload = { sub: userDoc._id.toString(), role: userDoc.role };
++    const token = jwt.sign(payload, process.env.JWT_SECRET!, { expiresIn: "1h" });
++    return res.status(201).json({ ok: true, userId: userDoc._id.toString(), token });
+*/
 }
-

@@ -1,44 +1,33 @@
-import { Schema, model, models, Document } from 'mongoose';
+/* FILE : model/contacts.ts */
+import mongoose, { Schema } from "mongoose";
 
-
-const HandleSchema = new Schema({
-platform: { type: String, enum: ['whatsapp','telegram','instagram','x','linkedin','messenger'], index: true },
-value: { type: String, index: true },
-verified: { type: Boolean, default: false },
-verification_method: { type: String },
-last_checked_at: { type: Date },
-consent_collected: { type: Boolean, default: false },
-metadata: { type: Schema.Types.Mixed },
-}, {_id: false});
-
-export interface IContact extends Document {
-  phone:           string;
-  name:            string;
-  email:           string;
-  company:         string;
-  address:         string;
-  jobTitle:        string;
-  birthday:        Date;
-  tags:            string[];
-  confidenceScore: number;
-  isRegistered:    boolean;
-  userRef:         Schema.Types.ObjectId;
-}
-
-const ContactSchema = new Schema<IContact>({
-  phone:           { type: String, unique: true, required: true },
-  name:            { type: String, required: true },
-  email:           String,
-  company:         String,
-  address:         String,
-  jobTitle:        String,
-  birthday:        Date,
-  tags:            [String],
-  confidenceScore: { type: Number, default: 0 },
-  isRegistered:    { type: Boolean, default: false },
-  userRef:         { type: Schema.Types.ObjectId, ref: 'User' }
+const PhoneSchema = new Schema({
+  label: { type: String, default: "mobile" },
+  value: { type: String, required: true },
 });
 
-//export default models.Contact || model<IContact>('Contact', ContactSchema);
-export const Contact: Model<IContact> = models.Contact || model<IContact>('Contact', ContactSchema);
+const EmailSchema = new Schema({
+  label: { type: String, default: "work" },
+  value: { type: String, required: true, lowercase: true, trim: true },
+});
 
+const ContactSchema = new Schema(
+  {
+    userId: { type: String, required: true, index: true },
+    name: { type: String, required: true },
+    phones: { type: [PhoneSchema], default: [] },
+    emails: { type: [EmailSchema], default: [] },
+    addresses: { type: [String], default: [] },
+    notes: { type: String, default: "" },
+    trustScore: { type: Number, default: 0, min: 0, max: 100 },
+    company: { type: String },
+    tags: { type: [String], default: [] },
+    linkedIn: { type: String },
+    twitter: { type: String },
+    isRegistered: {type: Boolean},
+    instagram: { type: String },
+  },
+  { timestamps: true },
+);
+
+export default mongoose.models.Contact || mongoose.model("Contact", ContactSchema);

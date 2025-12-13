@@ -1,35 +1,29 @@
-// File:: models/CallLog.ts
-import {Schema, model, models } from 'mongoose';
+/* File:: models/CallLog.ts */
+import mongoose, { Schema } from "mongoose";
 
-export interface ICallLog extends Document {
-   userId: string;
-   contactId?: string;
-   phoneNumber: string;
-   type: 'incoming' | 'outgoing' | 'missed' | 'sms';
-   /** Duration of the call in seconds. Optional, defaults to 0 if unknown. */
-   duration?: number;
-   timestamp: Date;
-   createdAt: Date;
-   updatedAt: Date;
-}
-
-
-const CallLogSchema = new Schema<ICallLog>(
+/**
+ * CallLog stores a record of calls or messages between two people.  Each
+ * log entry captures who initiated the interaction (`fromPersonId`), who
+ * received it (`toPersonId`), the owning user (`userId`), the type of
+ * interaction (call or sms), the duration of the call in seconds (for
+ * calls), and when it occurred (`timestamp`).
+ */
+const CallLogSchema = new Schema(
   {
     userId: { type: String, required: true, index: true },
-    contactId: { type: String },
-    phoneNumber: { type: String, required: true },
-    //type: { type: String, enum: ['sms', 'incoming', 'outgoing', 'missed'], required: true },
-    type: { type: String, required: true },
-    timestamp: { type: Date, default: Date.now },
+    fromPersonId: { type: Schema.Types.ObjectId, ref: "Person", required: true, index: true },
+    toPersonId: { type: Schema.Types.ObjectId, ref: "Person", required: true, index: true },
+    type: { type: String, enum: ["call", "sms"], required: true },
     duration: { type: Number, default: 0 },
+    timestamp: { type: Date, required: true },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
+// Index for efficient queries on call history.
+CallLogSchema.index({ fromPersonId: 1, toPersonId: 1, timestamp: -1 });
 
-export const CallLog: Model<ICallLog> = models.CallLog || model<ICallLog>('CallLog', CallLogSchema);
-
-//export default models.CallLog || model('CallLog', CallLogSchema);
+export default mongoose.models.CallLog ||
+  mongoose.model("CallLog", CallLogSchema);
 
 

@@ -22,7 +22,7 @@ export default function ContactsPage() {
       </Box>
     );
   }
-  if (contacts.length === 0) {
+  if (!contacts || contacts.length === 0) {
     return (
       <Box p={6}>
         <Heading>No contacts found.</Heading>

@@ -1,10 +1,11 @@
 /*** File: safecontacts/pages/api/sync/index.ts */
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToDatabase } from '../../../lib/db';
-import { Contact } from '../../../models/Contact';
-import { UpdateEvent } from '../../../models/UpdateEvent';
+import mongoose from 'mongoose';
+import { connect } from '../../../lib/mongodb';
+import Contact from '../../../models/Contact';
+import UpdateEvent from '../../../models/UpdateEvent';
 import { SyncSnapshot } from '../../../models/SyncSnapshot';
-import { requireAuth } from '../../../lib/auth';
+import { withAuth } from '../../../lib/auth';
 
 /**
  * Sync endpoint for device contacts.  Clients should POST a JSON payload with
@@ -14,19 +15,19 @@ import { requireAuth } from '../../../lib/auth';
  * events for changed fields, and persist the new snapshot.  The response
  * includes counts of inserted and updated contacts.
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  await connectToDatabase();
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { method } = req;
   if (method !== 'POST') {
     return res.setHeader('Allow', ['POST']).status(405).end(`Method ${method} Not Allowed`);
   }
-  let authUserId: string | undefined;
-  try {
-    await requireAuth(req, res);
-    authUserId = (req as any).user?.sub;
-  } catch (err) {
-    // no auth; continue
+  
+  // Ensure database connection
+  if (mongoose.connection.readyState === 0) {
+    await connect();
   }
+  
+  const user: any = (req as any).user;
+  const authUserId: string | undefined = user?.sub;
   const { contacts: incomingContacts, userId: bodyUserId } = req.body;
   const userId: string | undefined = authUserId || bodyUserId;
   if (!userId || !Array.isArray(incomingContacts)) {
@@ -50,9 +51,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { name, phones = [], emails = [], addresses = [], notes } = rawContact;
     const primaryPhoneObj = phones[0];
     const normalized = primaryPhoneObj?.value ? String(primaryPhoneObj.value).replace(/\D/g, '') : '';
-    const sanitizedPhones = phones.map((p: any) => ({ label: p.label || '', value: String(p.value) }));
-    const sanitizedEmails = emails.map((e: any) => ({ label: e.label || '', value: String(e.value) }));
-    const sanitizedAddresses = addresses.map((a: any) => ({ label: a.label || '', value: String(a.value) }));
+    const sanitizedPhones = phones.map((p: any) => ({ label: p.label || 'mobile', value: String(p.value) }));
+    const sanitizedEmails = emails.map((e: any) => ({ label: e.label || 'work', value: String(e.value).toLowerCase().trim() }));
+    // Addresses in Contact model are just strings, not objects
+    const sanitizedAddresses = addresses.map((a: any) => typeof a === 'string' ? a : (a?.value || a?.label || String(a)));
+    // For snapshot, keep addresses as they are (can be objects)
     const snapshotObj = { name, phones: sanitizedPhones, emails: sanitizedEmails, addresses: sanitizedAddresses, notes: notes || '' };
     snapshotContacts.push(snapshotObj);
     if (!normalized) {
@@ -106,5 +109,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   );
   return res.status(200).json({ inserted, updated, count: incomingContacts.length });
 }
+
+export default withAuth(handler);
 
 
