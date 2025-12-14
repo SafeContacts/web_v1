@@ -41,12 +41,114 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (mongoose.connection.readyState === 0) {
       await mongoose.connect(process.env.MONGODB_URI!, {});
     }
+    
+    // Check if user is admin and wants full network view
+    const { fullNetwork } = req.query;
+    const isAdmin = user.role === "admin";
+    const showFullNetwork = isAdmin && fullNetwork === "true";
+    
     // Find caller's personId
     const caller = await User.findById(user.sub).lean();
     if (!caller || !caller.personId) {
       return res.status(404).json({ ok: false, code: "NOT_FOUND", message: "Person not found for user" });
     }
     const personId = caller.personId.toString();
+    
+    // If admin wants full network, return all nodes and edges
+    if (showFullNetwork) {
+      const allEdges = await ContactEdge.find({}).lean();
+      const allTrustEdges = await TrustEdge.find({}).lean();
+      
+      // Get all unique person IDs
+      const allPersonIds = new Set<string>();
+      allEdges.forEach((e) => {
+        allPersonIds.add(e.fromPersonId.toString());
+        allPersonIds.add(e.toPersonId.toString());
+      });
+      allTrustEdges.forEach((e) => {
+        allPersonIds.add(e.fromPersonId.toString());
+        allPersonIds.add(e.toPersonId.toString());
+      });
+      
+      // Get all persons
+      const allPersons = await Person.find({ _id: { $in: Array.from(allPersonIds) } }).lean();
+      const personMap: Record<string, any> = {};
+      allPersons.forEach((p) => {
+        personMap[p._id.toString()] = p;
+      });
+      
+      // Get all users to identify registered nodes
+      const allUsers = await User.find({}).lean();
+      const userPersonMap: Record<string, any> = {};
+      allUsers.forEach((u) => {
+        if (u.personId) {
+          userPersonMap[u.personId.toString()] = u;
+        }
+      });
+      
+      // Get all aliases
+      const allAliases = await ContactAlias.find({}).lean();
+      const aliasMap: Record<string, Record<string, string>> = {}; // userId -> personId -> alias
+      allAliases.forEach((a) => {
+        if (!aliasMap[a.userId]) aliasMap[a.userId] = {};
+        aliasMap[a.userId][a.personId.toString()] = a.alias;
+      });
+      
+      // Build nodes
+      const nodes = Array.from(allPersonIds).map((id) => {
+        const p = personMap[id];
+        const isRegistered = !!userPersonMap[id];
+        const user = userPersonMap[id];
+        
+        // Try to get alias from any user who has this person
+        let label = p?.emails?.[0]?.value || p?.phones?.[0]?.value || id;
+        for (const userId in aliasMap) {
+          if (aliasMap[userId][id]) {
+            label = aliasMap[userId][id];
+            break;
+          }
+        }
+        
+        return {
+          id,
+          type: isRegistered ? "registered" : "contact",
+          label,
+          trustScore: p?.trustScore || 0,
+          isRegistered,
+          registeredUserId: user?._id?.toString() || null,
+        };
+      });
+      
+      // Build edges
+      const edges: any[] = [];
+      const edgeMap = new Map<string, any>();
+      
+      allEdges.forEach((e) => {
+        const key = `${e.fromPersonId.toString()}-${e.toPersonId.toString()}`;
+        if (!edgeMap.has(key)) {
+          edgeMap.set(key, {
+            source: e.fromPersonId.toString(),
+            target: e.toPersonId.toString(),
+            relation: "contact",
+            weight: e.weight || 1,
+          });
+        }
+      });
+      
+      edgeMap.forEach((edge) => edges.push(edge));
+      
+      allTrustEdges.forEach((e) => {
+        edges.push({
+          source: e.fromPersonId.toString(),
+          target: e.toPersonId.toString(),
+          relation: "trust",
+          level: e.level,
+          weight: 1,
+        });
+      });
+      
+      return res.status(200).json({ nodes, links: edges, edges, isFullNetwork: true });
+    }
     
     // Fetch all contact edges (both directions to detect mutual connections)
     const outgoingContactEdges = await ContactEdge.find({ fromPersonId: caller.personId }).lean();
@@ -223,7 +325,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     });
     
-    return res.status(200).json({ nodes, edges });
+    return res.status(200).json({ nodes, links: edges, edges });
   } catch (err: any) {
     console.error(err);
     return res.status(500).json({ ok: false, code: "INTERNAL_ERROR", message: "Failed to build network graph" });

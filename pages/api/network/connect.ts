@@ -8,6 +8,8 @@ import Person from "../../../models/Person";
 import ConnectionRequest from "../../../models/ConnectionRequest";
 import ContactEdge from "../../../models/ContactEdge";
 import ContactAlias from "../../../models/ContactAlias";
+import BlockedContact from "../../../models/BlockedContact";
+import { getConnectionPathDetails } from "../../../lib/networkPath";
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { method } = req;
@@ -37,6 +39,26 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           return res.status(400).json({ ok: false, code: "VALIDATION_ERROR", message: "toPersonId is required" });
         }
 
+        // Check if user is blocked
+        const toPerson = await Person.findById(toPersonId).lean();
+        if (toPerson) {
+          const isBlocked = await BlockedContact.findOne({
+            userId: user.sub,
+            $or: [
+              { personId: toPersonId },
+              { phoneNumber: toPerson.phones?.[0]?.value || toPerson.phones?.[0]?.e164 },
+            ],
+          }).lean();
+
+          if (isBlocked) {
+            return res.status(403).json({
+              ok: false,
+              code: "BLOCKED",
+              message: "Cannot send request to blocked contact",
+            });
+          }
+        }
+
         // Check if already connected
         const existingEdge = await ContactEdge.findOne({
           fromPersonId,
@@ -47,18 +69,34 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           return res.status(400).json({ ok: false, code: "ALREADY_CONNECTED", message: "Already connected to this person" });
         }
 
-        // Check if request already exists
-        const existingRequest = await ConnectionRequest.findOne({
+        // Check for existing requests (including rejected ones)
+        const existingRequests = await ConnectionRequest.find({
           fromPersonId,
           toPersonId,
-        }).lean();
+        })
+          .sort({ createdAt: -1 })
+          .lean();
 
-        if (existingRequest) {
+        // Check if there's a pending request
+        const pendingRequest = existingRequests.find((r) => r.status === "pending");
+        if (pendingRequest) {
           return res.status(400).json({
             ok: false,
             code: "REQUEST_EXISTS",
             message: "Connection request already sent",
-            request: existingRequest,
+            request: pendingRequest,
+          });
+        }
+
+        // Check request count - max 2 requests allowed
+        const rejectedRequests = existingRequests.filter((r) => r.status === "rejected");
+        const totalRequestCount = existingRequests.reduce((sum, r) => sum + (r.requestCount || 1), 0);
+
+        if (totalRequestCount >= 2) {
+          return res.status(400).json({
+            ok: false,
+            code: "MAX_REQUESTS_REACHED",
+            message: "Maximum number of connection requests (2) has been reached for this contact",
           });
         }
 
@@ -69,6 +107,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           toPersonId,
           status: "pending",
           message: message || "",
+          requestCount: totalRequestCount + 1,
         });
 
         return res.status(201).json({
@@ -78,6 +117,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             status: request.status,
             message: request.message,
             createdAt: request.createdAt,
+            requestCount: request.requestCount,
           },
         });
       }
@@ -192,19 +232,53 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               personId: otherPersonId,
             }).lean();
 
+            // For incoming requests, get connection path and full sender details
+            let connectionPath = null;
+            let senderDetails: any = null;
+
+            if (isIncoming) {
+              // Get connection path details
+              connectionPath = await getConnectionPathDetails(
+                fromPersonId,
+                fromPerson._id,
+                user.sub,
+                2
+              );
+
+              // Get full sender details (phone, email)
+              senderDetails = {
+                phones: fromPerson.phones || [],
+                emails: fromPerson.emails || [],
+              };
+            }
+
             return {
               id: req._id.toString(),
               status: req.status,
               message: req.message,
               isIncoming,
+              requestCount: req.requestCount || 1,
               fromPerson: {
                 id: fromPerson._id.toString(),
                 name: alias?.alias || fromPerson.emails?.[0]?.value || fromPerson.phones?.[0]?.value || "Unknown",
+                ...(isIncoming && senderDetails ? { phones: senderDetails.phones, emails: senderDetails.emails } : {}),
               },
               toPerson: {
                 id: toPerson._id.toString(),
                 name: toPerson.emails?.[0]?.value || toPerson.phones?.[0]?.value || "Unknown",
               },
+              connectionPath: connectionPath
+                ? {
+                    level: connectionPath.level,
+                    viaPersonName: connectionPath.viaPersonName,
+                    description:
+                      connectionPath.level === 1
+                        ? "1st Connection"
+                        : connectionPath.viaPersonName
+                        ? `${connectionPath.level}nd Connection via ${connectionPath.viaPersonName}`
+                        : `${connectionPath.level}nd Connection`,
+                  }
+                : null,
               createdAt: req.createdAt,
             };
           })

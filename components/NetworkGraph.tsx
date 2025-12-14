@@ -17,7 +17,15 @@ interface GraphData {
     fx?: number;
     fy?: number;
   }>;
-  links: Array<{
+  links?: Array<{
+    source: string;
+    target: string;
+    relation?: string;
+    weight?: number;
+    level?: number;
+    mutual?: boolean;
+  }>;
+  edges?: Array<{
     source: string;
     target: string;
     relation?: string;
@@ -41,6 +49,9 @@ export default function NetworkGraph({ data }: { data: GraphData | null }) {
   // Find self node and center it
   const selfNode = data.nodes.find((n) => n.type === 'self');
   
+  // Handle both 'links' and 'edges' from API
+  const edgesOrLinks = data.links || data.edges || [];
+  
   // Transform data for react-force-graph-2d
   const graphData = {
     nodes: data.nodes.map((node) => ({
@@ -51,7 +62,7 @@ export default function NetworkGraph({ data }: { data: GraphData | null }) {
       fx: node.fx, // Fixed x position for centering
       fy: node.fy, // Fixed y position for centering
     })),
-    links: data.links.map((link) => ({
+    links: edgesOrLinks.map((link) => ({
       source: typeof link.source === 'string' ? link.source : link.source.id,
       target: typeof link.target === 'string' ? link.target : link.target.id,
       relation: link.relation,

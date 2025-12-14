@@ -16,12 +16,13 @@ const ConnectionRequestSchema = new Schema(
       index: true,
     },
     message: { type: String, default: "" }, // Optional message with the request
+    requestCount: { type: Number, default: 1 }, // Track number of requests sent for this pair
   },
   { timestamps: true },
 );
 
-// Prevent duplicate requests between the same pair
-ConnectionRequestSchema.index({ fromPersonId: 1, toPersonId: 1 }, { unique: true });
+// Index on fromPersonId and toPersonId (not unique anymore, to allow retries)
+ConnectionRequestSchema.index({ fromPersonId: 1, toPersonId: 1 });
 ConnectionRequestSchema.index({ status: 1, createdAt: -1 });
 
 export default mongoose.models.ConnectionRequest ||

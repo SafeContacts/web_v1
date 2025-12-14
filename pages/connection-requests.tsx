@@ -20,16 +20,29 @@ import {
   TabPanels,
   Tab,
   TabPanel,
+  Divider,
+  Icon,
 } from '@chakra-ui/react';
-import { CheckIcon, CloseIcon, ArrowBackIcon } from '@chakra-ui/icons';
+import { CheckIcon, CloseIcon, ArrowBackIcon, PhoneIcon, EmailIcon } from '@chakra-ui/icons';
 
 interface ConnectionRequest {
   id: string;
   status: string;
   message: string;
   isIncoming: boolean;
-  fromPerson: { id: string; name: string };
+  requestCount?: number;
+  fromPerson: {
+    id: string;
+    name: string;
+    phones?: Array<{ label: string; value: string; e164?: string }>;
+    emails?: Array<{ label: string; value: string }>;
+  };
   toPerson: { id: string; name: string };
+  connectionPath?: {
+    level: number;
+    viaPersonName?: string;
+    description: string;
+  } | null;
   createdAt: string;
 }
 
@@ -196,17 +209,78 @@ export default function ConnectionRequestsPage() {
                     <CardBody>
                       <VStack align="stretch" spacing={3}>
                         <HStack justify="space-between">
-                          <Text fontWeight="bold">{req.fromPerson.name}</Text>
+                          <VStack align="start" spacing={1}>
+                            <Text fontWeight="bold" fontSize="lg">
+                              {req.fromPerson.name}
+                            </Text>
+                            {req.connectionPath && (
+                              <Badge colorScheme={req.connectionPath.level === 1 ? 'green' : 'blue'} fontSize="xs">
+                                {req.connectionPath.description}
+                              </Badge>
+                            )}
+                          </VStack>
                           <Badge colorScheme="orange">Pending</Badge>
                         </HStack>
-                        {req.message && (
-                          <Text fontSize="sm" color="gray.600">
-                            {req.message}
-                          </Text>
+
+                        {/* Connection Path Info */}
+                        {req.connectionPath && req.connectionPath.level > 1 && req.connectionPath.viaPersonName && (
+                          <Box
+                            bg={useColorModeValue('blue.50', 'blue.900')}
+                            p={2}
+                            borderRadius="md"
+                            fontSize="sm"
+                          >
+                            <Text color="blue.600" fontWeight="medium">
+                              Connected via: {req.connectionPath.viaPersonName}
+                            </Text>
+                          </Box>
                         )}
-                        <Text fontSize="xs" color="gray.500">
-                          {new Date(req.createdAt).toLocaleString()}
-                        </Text>
+
+                        {/* Sender Contact Information */}
+                        {(req.fromPerson.phones || req.fromPerson.emails) && (
+                          <Box>
+                            <Text fontSize="xs" color="gray.500" mb={1} fontWeight="medium">
+                              Contact Information:
+                            </Text>
+                            <VStack align="stretch" spacing={1}>
+                              {req.fromPerson.phones?.map((phone, idx) => (
+                                <HStack key={idx} spacing={2}>
+                                  <Icon as={PhoneIcon} color="gray.500" boxSize={3} />
+                                  <Text fontSize="sm">{phone.value}</Text>
+                                </HStack>
+                              ))}
+                              {req.fromPerson.emails?.map((email, idx) => (
+                                <HStack key={idx} spacing={2}>
+                                  <Icon as={EmailIcon} color="gray.500" boxSize={3} />
+                                  <Text fontSize="sm">{email.value}</Text>
+                                </HStack>
+                              ))}
+                            </VStack>
+                          </Box>
+                        )}
+
+                        {req.message && (
+                          <>
+                            <Divider />
+                            <Text fontSize="sm" color="gray.600" fontStyle="italic">
+                              "{req.message}"
+                            </Text>
+                          </>
+                        )}
+
+                        <Divider />
+
+                        <HStack justify="space-between">
+                          <Text fontSize="xs" color="gray.500">
+                            {new Date(req.createdAt).toLocaleString()}
+                          </Text>
+                          {req.requestCount && req.requestCount > 1 && (
+                            <Badge colorScheme="gray" fontSize="xs">
+                              Request #{req.requestCount}
+                            </Badge>
+                          )}
+                        </HStack>
+
                         <HStack spacing={2}>
                           <Button
                             size="sm"

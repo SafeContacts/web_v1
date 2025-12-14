@@ -6,7 +6,8 @@ const UserSchema = new Schema({
   passwordHash: { type: String, required: true },
   username:     { type: String, required: true },
   personId: 	{ type: Schema.Types.ObjectId, ref: "Person", required: true },
-  role:         { type: String, enum: ['admin','user','business'], default: 'user' }
+  role:         { type: String, enum: ['admin','user','business'], default: 'user' },
+  stealthMode:  { type: Boolean, default: false } // If true, user doesn't send network updates
 });
 
 export default models.User || model("User", UserSchema);

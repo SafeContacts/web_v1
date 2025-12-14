@@ -8,6 +8,7 @@ import Person from "../../../models/Person";
 import ContactEdge from "../../../models/ContactEdge";
 import ContactAlias from "../../../models/ContactAlias";
 import ConnectionRequest from "../../../models/ConnectionRequest";
+import BlockedContact from "../../../models/BlockedContact";
 
 // Admin configurable network depth (default: 2 for first and second level)
 const NETWORK_DEPTH = parseInt(process.env.NETWORK_SEARCH_DEPTH || "2", 10);
@@ -104,6 +105,35 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Get aliases for all persons
     const personIds = persons.map((p) => p._id);
+    
+    // Filter out blocked contacts
+    const blockedContacts = await BlockedContact.find({
+      userId: user.sub,
+      $or: [
+        { personId: { $in: personIds } },
+        { phoneNumber: { $in: persons.flatMap((p) => p.phones?.map((ph: any) => ph.value || ph.e164) || []) } },
+      ],
+    }).lean();
+    
+    const blockedPersonIds = new Set(
+      blockedContacts
+        .map((b) => b.personId?.toString())
+        .filter((id) => id)
+    );
+    const blockedPhones = new Set(
+      blockedContacts
+        .map((b) => b.phoneNumber)
+        .filter((phone) => phone)
+    );
+    
+    // Filter out blocked persons
+    const filteredPersons = persons.filter((p) => {
+      const personIdStr = p._id.toString();
+      if (blockedPersonIds.has(personIdStr)) return false;
+      const personPhones = p.phones?.map((ph: any) => ph.value || ph.e164) || [];
+      if (personPhones.some((phone) => blockedPhones.has(phone))) return false;
+      return true;
+    });
     const aliases = await ContactAlias.find({
       personId: { $in: personIds },
     }).lean();
@@ -129,7 +159,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
     // Build results with privacy controls
-    const results = persons.map((person) => {
+    const results = filteredPersons.map((person) => {
       const personIdStr = person._id.toString();
       const isFirstLevel = firstLevelPersonIds.has(personIdStr);
       const isSecondLevel = secondLevelPersonIds.has(personIdStr);

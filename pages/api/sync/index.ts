@@ -5,6 +5,10 @@ import { connect } from '../../../lib/mongodb';
 import Contact from '../../../models/Contact';
 import UpdateEvent from '../../../models/UpdateEvent';
 import { SyncSnapshot } from '../../../models/SyncSnapshot';
+import Person from '../../../models/Person';
+import ContactEdge from '../../../models/ContactEdge';
+import ContactAlias from '../../../models/ContactAlias';
+import User from '../../../models/User';
 import { withAuth } from '../../../lib/auth';
 
 /**
@@ -91,7 +95,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     } else {
       inserted++;
-      await Contact.create({
+      const newContact = await Contact.create({
         userId,
         name: name || '(unknown)',
         phones: sanitizedPhones,
@@ -100,6 +104,57 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         notes: notes || '',
         trustScore: 0,
       });
+      
+      // Create or link Person entry for network node
+      const primaryPhone = sanitizedPhones[0]?.value;
+      const phoneE164 = primaryPhone ? '+' + primaryPhone.replace(/\D/g, '') : null;
+      const emailValue = sanitizedEmails[0]?.value?.toLowerCase().trim();
+      
+      let person = await Person.findOne({
+        $or: [
+          ...(phoneE164 ? [{ 'phones.e164': phoneE164 }, { 'phones.value': primaryPhone }] : []),
+          ...(emailValue ? [{ 'emails.value': emailValue }] : []),
+        ],
+      }).lean();
+      
+      if (!person && primaryPhone) {
+        // Create new Person
+        person = await Person.create({
+          phones: sanitizedPhones.map((p: any) => ({
+            label: p.label || 'mobile',
+            value: p.value,
+            e164: '+' + p.value.replace(/\D/g, ''),
+          })),
+          emails: sanitizedEmails.map((e: any) => ({
+            label: e.label || 'work',
+            value: e.value.toLowerCase().trim(),
+          })),
+          addresses: sanitizedAddresses,
+        });
+      }
+      
+      // Create ContactAlias and ContactEdge if user has personId
+      if (person) {
+        const userDoc = await User.findById(userId).lean();
+        if (userDoc && userDoc.personId) {
+          const fromPersonId = userDoc.personId;
+          const toPersonId = person._id;
+          
+          // Create ContactAlias
+          await ContactAlias.findOneAndUpdate(
+            { userId, personId: toPersonId },
+            { alias: name || '(unknown)', tags: [], notes: notes || '' },
+            { upsert: true, new: true }
+          );
+          
+          // Create ContactEdge (network node connection)
+          await ContactEdge.findOneAndUpdate(
+            { fromPersonId, toPersonId },
+            { $inc: { weight: 1 }, lastContactedAt: new Date() },
+            { upsert: true, new: true }
+          );
+        }
+      }
     }
   }
   await SyncSnapshot.findOneAndUpdate(

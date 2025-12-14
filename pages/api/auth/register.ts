@@ -20,13 +20,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   const passwordHash = await bcrypt.hash(password, 10);
 
-  // Create a Person record.  We set registeredUserId later once the User is created.
-  const person = await Person.create({
-    phones: [{value: phone}], emails: [{value: phone + '@hidden.safe.local'}],
+  // Check if Person already exists (from synced contacts) - if so, link to it
+  const phoneE164 = '+' + phone.replace(/\D/g, '');
+  let person = await Person.findOne({
+    $or: [
+      { 'phones.e164': phoneE164 },
+      { 'phones.value': phone },
+    ],
   });
 
+  if (!person) {
+    // Create a Person record.  We set registeredUserId later once the User is created.
+    person = await Person.create({
+      phones: [{ label: 'mobile', value: phone, e164: phoneE164 }],
+      emails: [{ label: 'work', value: phone + '@hidden.safe.local' }],
+    });
+  } else {
+    // Update existing Person to mark it as registered
+    // This "takes up" the node when a synced contact registers
+    if (!person.phones?.some((p: any) => p.value === phone || p.e164 === phoneE164)) {
+      person.phones.push({ label: 'mobile', value: phone, e164: phoneE164 });
+    }
+  }
+
   // Create a User referencing the person
-  const user = await User.create({ username:name, personId: person._id, role: "user", phone, passwordHash });
+  const user = await User.create({ username: name, personId: person._id, role: "user", phone, passwordHash });
   // Link the Person back to the user as the registered account.
   person.registeredUserId = user._id.toString();
   await person.save();

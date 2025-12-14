@@ -39,24 +39,70 @@ export default function Settings() {
       router.push('/login');
       return;
     }
-    // Load user preferences from localStorage or API
-    const savedStealth = localStorage.getItem('stealthMode');
-    if (savedStealth !== null) {
-      setStealth(savedStealth === 'true');
-    }
+    
+    // Load stealth mode from API (User model)
+    const loadSettings = async () => {
+      try {
+        const res = await fetch('/api/user/settings', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setStealth(data.stealthMode || false);
+          setUser(data);
+        }
+      } catch (err) {
+        console.error('Failed to load settings:', err);
+        // Fallback to localStorage
+        const savedStealth = localStorage.getItem('stealthMode');
+        if (savedStealth !== null) {
+          setStealth(savedStealth === 'true');
+        }
+      }
+    };
+    
+    loadSettings();
   }, [router]);
 
   const handleStealthToggle = async () => {
     const newValue = !stealth;
-    setStealth(newValue);
-    localStorage.setItem('stealthMode', String(newValue));
-    toast({
-      status: 'success',
-      title: 'Settings Updated',
-      description: `Stealth mode ${newValue ? 'enabled' : 'disabled'}`,
-      duration: 3000,
-      isClosable: true,
-    });
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    
+    try {
+      const res = await fetch('/api/user/settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ stealthMode: newValue }),
+      });
+      
+      if (res.ok) {
+        setStealth(newValue);
+        toast({
+          status: 'success',
+          title: 'Settings Updated',
+          description: `Stealth mode ${newValue ? 'enabled' : 'disabled'}`,
+          duration: 3000,
+          isClosable: true,
+        });
+      } else {
+        throw new Error('Failed to update settings');
+      }
+    } catch (err: any) {
+      toast({
+        status: 'error',
+        title: 'Failed to update settings',
+        description: err.message || 'An error occurred',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
   };
 
   const handleLogout = () => {

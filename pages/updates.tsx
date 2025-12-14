@@ -22,10 +22,23 @@ import {
 import { RepeatIcon } from '@chakra-ui/icons';
 import UpdateEventCard, { UpdateEvent } from '../components/UpdateEventCard';
 
+interface NetworkUpdateEvent {
+  id: string;
+  personId: string;
+  personName: string;
+  fromUserId: string;
+  fromUserName: string;
+  field: string;
+  oldValue: string;
+  newValue: string;
+  createdAt: string;
+  isRegistered: boolean;
+}
+
 export default function UpdatesPage() {
   const router = useRouter();
   const toast = useToast();
-  const [events, setEvents] = useState<UpdateEvent[]>([]);
+  const [events, setEvents] = useState<NetworkUpdateEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -40,7 +53,7 @@ export default function UpdatesPage() {
         return;
       }
 
-      const res = await fetch('/api/updates', {
+      const res = await fetch('/api/updates/network', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -73,7 +86,7 @@ export default function UpdatesPage() {
     loadUpdates();
   };
 
-  const applyEvent = async (evt: UpdateEvent) => {
+  const applyEvent = async (evt: NetworkUpdateEvent) => {
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       if (!token) {
@@ -81,43 +94,30 @@ export default function UpdatesPage() {
         return;
       }
 
-      // 1) Patch the contact
-      const patchRes = await fetch(`/api/contacts/${evt.contactId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          [evt.field]: evt.newValue,
-        }),
-      });
-
-      if (!patchRes.ok) {
-        throw new Error('Failed to update contact');
-      }
-
-      // 2) Mark the update event as applied (stealth: false)
-      await fetch(`/api/contacts/${evt.contactId}/update`, {
+      // Mark the update event as applied
+      const updateRes = await fetch(`/api/updates/${evt.id}/apply`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
+          personId: evt.personId,
           field: evt.field,
-          oldValue: evt.oldValue,
           newValue: evt.newValue,
-          stealth: false,
         }),
       });
 
-      // 3) Remove it from UI
+      if (!updateRes.ok) {
+        throw new Error('Failed to apply update');
+      }
+
+      // Remove it from UI
       setEvents((evts) => evts.filter((e) => e.id !== evt.id));
       toast({
         status: 'success',
         title: 'Update Applied',
-        description: `${evt.field} has been updated for ${evt.contactName}`,
+        description: `${evt.field} has been updated for ${evt.personName}`,
         duration: 3000,
         isClosable: true,
       });
@@ -133,7 +133,7 @@ export default function UpdatesPage() {
     }
   };
 
-  const ignoreEvent = async (evt: UpdateEvent) => {
+  const ignoreEvent = async (evt: NetworkUpdateEvent) => {
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       if (!token) {
@@ -141,18 +141,18 @@ export default function UpdatesPage() {
         return;
       }
 
-      // Mark as non-stealth so it won't reappear
-      await fetch(`/api/contacts/${evt.contactId}/update`, {
+      // Mark update as applied (so it won't reappear)
+      await fetch(`/api/updates/${evt.id}/apply`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
+          personId: evt.personId,
           field: evt.field,
-          oldValue: evt.oldValue,
-          newValue: evt.newValue,
-          stealth: false,
+          newValue: evt.oldValue, // Keep old value (ignore the update)
+          ignore: true,
         }),
       });
 
@@ -258,7 +258,20 @@ export default function UpdatesPage() {
       ) : (
         <VStack spacing={4} align="stretch">
           {events.map((evt) => (
-            <UpdateEventCard key={evt.id} event={evt} onApply={applyEvent} onIgnore={ignoreEvent} />
+            <UpdateEventCard
+              key={evt.id}
+              event={{
+                id: evt.id,
+                contactId: evt.personId,
+                contactName: evt.personName,
+                field: evt.field,
+                oldValue: evt.oldValue,
+                newValue: evt.newValue,
+                createdAt: evt.createdAt,
+              }}
+              onApply={() => applyEvent(evt)}
+              onIgnore={() => ignoreEvent(evt)}
+            />
           ))}
         </VStack>
       )}
