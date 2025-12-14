@@ -27,7 +27,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     case "GET": {
       return res.status(200).json(contact);
     }
-    case "PUT": {
+    case "PUT":
+    case "PATCH": {
       const allowed = [
         "name",
         "phones",
@@ -49,7 +50,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(200).json(contact);
     }
     default:
-      res.setHeader("Allow", ["GET", "PUT"]);
+      res.setHeader("Allow", ["GET", "PUT", "PATCH"]);
       return res.status(405).end();
   }
 }

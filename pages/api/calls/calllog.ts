@@ -25,15 +25,29 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!user?.sub) {
     return res.status(401).json({ ok: false, code: "UNAUTHORIZED" });
   }
-  if (method !== "POST") {
-    res.setHeader("Allow", ["POST"]);
-    return res.status(405).end();
+  // Ensure database connection
+  if (mongoose.connection.readyState === 0) {
+    await mongoose.connect(process.env.MONGODB_URI!, {});
   }
-  try {
-    // Connect to DB if not already connected
-    if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(process.env.MONGODB_URI!, {});
+
+  switch (method) {
+    case "GET": {
+      try {
+        const { limit = '50' } = req.query;
+        const userId = user.sub;
+        const logs = await CallLog.find({ userId, type: 'call' })
+          .sort({ timestamp: -1 })
+          .limit(parseInt(limit as string, 10) || 50)
+          .populate('toPersonId', 'phones emails')
+          .lean();
+        return res.status(200).json(logs);
+      } catch (err: any) {
+        console.error(err);
+        return res.status(500).json({ ok: false, code: "INTERNAL_ERROR", message: "Failed to fetch call logs" });
+      }
     }
+    case "POST": {
+      try {
     const { toAliasId, toPersonId, type, duration } = req.body || {};
     if (!type || !["call", "sms"].includes(type)) {
       return res.status(400).json({ ok: false, code: "VALIDATION_ERROR", message: "Invalid or missing type" });
@@ -90,16 +104,38 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     } else {
       await ContactEdge.create({ fromPersonId, toPersonId: targetPersonId, weight: 1, lastContactedAt: now });
     }
-    return res.status(201).json({
-      _id: log._id.toString(),
-      type: log.type,
-      duration: log.duration,
-      timestamp: log.timestamp,
-      toPersonId: targetPersonId.toString(),
-    });
-  } catch (err: any) {
-    console.error(err);
-    return res.status(500).json({ ok: false, code: "INTERNAL_ERROR", message: "Failed to create call log" });
+    
+    // Update trust score based on interactions
+    try {
+      const { calculateTrustScoreFromInteractions } = await import("../../../lib/trustScore");
+      const trustScore = await calculateTrustScoreFromInteractions(
+        fromPersonId,
+        targetPersonId,
+        user.sub
+      );
+      // Update Person's trust score
+      await Person.findByIdAndUpdate(targetPersonId, {
+        $set: { trustScore: trustScore },
+      }, { upsert: false });
+    } catch (err) {
+      console.error('Failed to update trust score', err);
+    }
+        return res.status(201).json({
+          _id: log._id.toString(),
+          type: log.type,
+          duration: log.duration,
+          timestamp: log.timestamp,
+          toPersonId: targetPersonId.toString(),
+        });
+      } catch (err: any) {
+        console.error(err);
+        return res.status(500).json({ ok: false, code: "INTERNAL_ERROR", message: "Failed to create call log" });
+      }
+    }
+    default: {
+      res.setHeader("Allow", ["GET", "POST"]);
+      return res.status(405).end(`Method ${method} Not Allowed`);
+    }
   }
 }
 

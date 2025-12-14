@@ -43,10 +43,16 @@ import { SearchIcon, AddIcon, RepeatIcon, PhoneIcon, EmailIcon, BuildingIcon, Vi
 
 interface Contact {
   _id: string;
-  alias: string;
-  tags: string[];
-  notes: string;
+  name?: string;
+  alias?: string;
+  tags?: string[];
+  notes?: string;
   updatedAt?: string;
+  phones?: Array<{ label?: string; value: string; e164?: string }>;
+  emails?: Array<{ label?: string; value: string }>;
+  addresses?: string[];
+  company?: string;
+  trustScore?: number;
   person?: {
     _id: string;
     phones: Array<{ label?: string; value: string; e164?: string }>;
@@ -102,18 +108,65 @@ export default function HomePage() {
     loadContacts();
   }, []);
 
+  const [pendingSync, setPendingSync] = useState(0);
+  const [networkUpdates, setNetworkUpdates] = useState(0);
+
   const total = contacts.length;
-  const verified = contacts.filter((c) => ((c.person?.trustScore ?? 0) >= 80)).length;
-  const pendingSync = 0;
-  const networkUpdates = 0;
+  const verified = contacts.filter((c) => {
+    const score = c.trustScore ?? c.person?.trustScore ?? 0;
+    return score >= 80;
+  }).length;
+
+  // Load sync status and network updates count
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+        if (!token) return;
+
+        // Load network updates count
+        const updatesRes = await fetch('/api/updates', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (updatesRes.ok) {
+          const updates = await updatesRes.json();
+          setNetworkUpdates(updates.length);
+        }
+      } catch (err) {
+        console.error('Failed to load stats', err);
+      }
+    }
+    if (contacts.length > 0) {
+      loadStats();
+    }
+  }, [contacts.length]);
 
   const filtered = contacts.filter((c) => {
     if (!query) return true;
-    const q = query.toLowerCase();
-    const aliasMatch = c.alias.toLowerCase().includes(q);
-    const phoneMatch = c.person?.phones?.some((p) => p.value.toLowerCase().includes(q)) ?? false;
-    const emailMatch = c.person?.emails?.some((e) => e.value.toLowerCase().includes(q)) ?? false;
-    return aliasMatch || phoneMatch || emailMatch;
+    const searchTerm = query.toLowerCase().trim();
+    const searchTermDigits = searchTerm.replace(/\D/g, ''); // Remove non-digits for phone search
+    
+    // Search by name
+    const name = c.name || c.alias || '';
+    const nameMatch = name.toLowerCase().includes(searchTerm);
+    
+    // Search by phone number (normalize for comparison)
+    const allPhones = c.phones || c.person?.phones || [];
+    const phoneMatch = allPhones.some((p) => {
+      if (!p.value) return false;
+      const phoneValue = p.value.replace(/\D/g, ''); // Remove formatting
+      const phoneLower = p.value.toLowerCase();
+      return phoneValue.includes(searchTermDigits) || phoneLower.includes(searchTerm);
+    });
+    
+    // Search by email
+    const allEmails = c.emails || c.person?.emails || [];
+    const emailMatch = allEmails.some((e) => {
+      if (!e.value) return false;
+      return e.value.toLowerCase().includes(searchTerm);
+    });
+    
+    return nameMatch || phoneMatch || emailMatch;
   });
 
   function getCompany(contact: Contact): string {
@@ -380,13 +433,14 @@ export default function HomePage() {
       ) : (
         <Grid templateColumns={{ base: "1fr", md: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }} gap={6}>
           {filtered.map((c) => {
-            const name = c.alias || "Unnamed";
-            const phones = c.person?.phones || [];
-            const emails = c.person?.emails || [];
+            // Get name from multiple possible sources
+            const name = c.name || c.alias || c.phones?.[0]?.value || c.person?.phones?.[0]?.value || "Unnamed";
+            const phones = c.phones || c.person?.phones || [];
+            const emails = c.emails || c.person?.emails || [];
             const phone = phones[0]?.value || "";
             const email = emails[0]?.value || "";
-            const company = getCompany(c);
-            const score = c.person?.trustScore ?? 0;
+            const company = c.company || getCompany(c);
+            const score = c.trustScore ?? c.person?.trustScore ?? 0;
             const scoreColor = score >= 80 ? "green" : score >= 50 ? "yellow" : "red";
 
             return (

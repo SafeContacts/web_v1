@@ -32,6 +32,8 @@ import {
   RepeatIcon,
   ViewIcon,
   SettingsIcon,
+  SearchIcon,
+  ChatIcon,
 } from '@chakra-ui/icons';
 
 interface LayoutProps {
@@ -40,9 +42,11 @@ interface LayoutProps {
 
 const navLinks = [
   { label: 'Contacts', href: '/', icon: ViewIcon },
+  { label: 'Discovery', href: '/discovery', icon: SearchIcon },
+  { label: 'Network', href: '/network', icon: ViewIcon },
+  { label: 'Connection Requests', href: '/connection-requests', icon: ChatIcon },
   { label: 'Dialer', href: '/dialer', icon: PhoneIcon },
   { label: 'Duplicates', href: '/duplicates', icon: RepeatIcon },
-  { label: 'Network', href: '/network', icon: ViewIcon },
 ];
 
 export default function Layout({ children }: LayoutProps) {
