@@ -276,15 +276,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const edges: any[] = [];
     const edgeMap = new Map<string, any>();
     
-    // Process outgoing contact edges
+    // Process outgoing contact edges (these are level 1 - direct connections)
     updatedOutgoingEdges.forEach((e) => {
       const key = `${e.fromPersonId.toString()}-${e.toPersonId.toString()}`;
+      const person = personMap[e.toPersonId.toString()];
+      const trustScore = person?.trustScore || 0;
       edgeMap.set(key, {
         source: e.fromPersonId.toString(),
         target: e.toPersonId.toString(),
         relation: "contact",
         weight: e.weight || 1,
         mutual: false,
+        level: 1, // Direct connection
+        trustScore: trustScore,
       });
     });
     
@@ -299,12 +303,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         existing.weight = (existing.weight || 1) + (e.weight || 1);
       } else {
         // Only incoming edge
+        const person = personMap[e.fromPersonId.toString()];
+        const trustScore = person?.trustScore || 0;
         edgeMap.set(key, {
           source: e.fromPersonId.toString(),
           target: e.toPersonId.toString(),
           relation: "contact",
           weight: e.weight || 1,
           mutual: false,
+          level: 1, // Direct connection
+          trustScore: trustScore,
         });
       }
     });

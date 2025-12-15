@@ -114,9 +114,11 @@ export default function NetworkGraph({ data }: { data: GraphData | null }) {
         linkColor={linkColor}
         linkWidth={(link: any) => {
           if (link.relation === 'trust') return 4;
-          // Weight-based width for contact edges
-          const baseWidth = link.mutual ? 3 : 2;
-          return baseWidth + Math.min(link.weight || 1, 5);
+          // Level 1 direct connections get hard/thick lines
+          if (link.level === 1) return 3;
+          // Weight-based width for other contact edges
+          const baseWidth = link.mutual ? 2 : 1.5;
+          return baseWidth + Math.min(link.weight || 1, 3);
         }}
         linkLabel={(link: any) => {
           let label = '';
@@ -145,9 +147,20 @@ export default function NetworkGraph({ data }: { data: GraphData | null }) {
           d3.force('charge', d3.forceManyBody().strength((node: any) => {
             return node.type === 'self' ? -800 : -200;
           }));
-          // Link force for better edge layout
+          // Link force for better edge layout with trust-based distances
           d3.force('link', d3.forceLink().id((d: any) => d.id).distance((link: any) => {
-            return link.relation === 'trust' ? 100 : 80;
+            if (link.relation === 'trust') return 100;
+            // Level 1 direct connections
+            if (link.level === 1) {
+              // Distance based on trust score: higher trust = closer (50-150 range)
+              // Trust score 0-100, invert so higher trust = lower distance
+              const trustScore = link.trustScore || 0;
+              // Map trust score to distance: 100 trust = 50 distance, 0 trust = 150 distance
+              const distance = 150 - (trustScore * 1.0); // 150 - 0 = 150 (far), 150 - 100 = 50 (close)
+              return Math.max(50, Math.min(150, distance)); // Clamp between 50-150
+            }
+            // Other connections (level 2+) are further away
+            return 200;
           }));
         }}
         onNodeDrag={(node: any) => {

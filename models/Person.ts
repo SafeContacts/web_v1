@@ -4,6 +4,7 @@ const PhoneSchema = new Schema({
   label: { type: String, default: "mobile" },
   value: { type: String, required: true },
   e164: { type: String, index: true },
+  countryCode: { type: String, default: "+91" }, // Store country code separately
 });
 
 const EmailSchema = new Schema({

@@ -25,7 +25,41 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
   switch (method) {
     case "GET": {
-      return res.status(200).json(contact);
+      // Decrypt contact data for authorized user
+      let decryptedContact: any;
+      if (contact.decryptForUser) {
+        decryptedContact = contact.decryptForUser();
+      } else {
+        // Fallback: manual decryption
+        const { decrypt } = require("../../../lib/encryption");
+        const doc = contact.toObject ? contact.toObject() : contact;
+        if (doc.encrypted !== false) {
+          try {
+            if (doc.phones && Array.isArray(doc.phones)) {
+              doc.phones = doc.phones.map((p: any) => ({
+                ...p,
+                value: decrypt(p.value),
+              }));
+            }
+            if (doc.emails && Array.isArray(doc.emails)) {
+              doc.emails = doc.emails.map((e: any) => ({
+                ...e,
+                value: decrypt(e.value),
+              }));
+            }
+            if (doc.addresses && Array.isArray(doc.addresses)) {
+              doc.addresses = doc.addresses.map((addr: string) => decrypt(addr));
+            }
+            if (doc.notes) {
+              doc.notes = decrypt(doc.notes);
+            }
+          } catch (err) {
+            console.error('Decryption error:', err);
+          }
+        }
+        decryptedContact = doc;
+      }
+      return res.status(200).json(decryptedContact);
     }
     case "PUT":
     case "PATCH": {
@@ -58,63 +92,71 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
       }
       
+      // Get old values before saving (for comparison) - decrypt if needed
+      const { decrypt } = require("../../../lib/encryption");
+      const decryptPhone = (p: any) => ({
+        ...p,
+        value: p.value && typeof p.value === 'string' && p.value.match(/^[0-9a-f]{128,}$/i) ? decrypt(p.value) : p.value,
+      });
+      const decryptEmail = (e: any) => ({
+        ...e,
+        value: e.value && typeof e.value === 'string' && e.value.match(/^[0-9a-f]{128,}$/i) ? decrypt(e.value) : e.value,
+      });
+      
+      const oldPhones = JSON.parse(JSON.stringify(contact.phones || []));
+      const oldEmails = JSON.parse(JSON.stringify(contact.emails || []));
+      const oldPhonesDecrypted = oldPhones.map(decryptPhone);
+      const oldEmailsDecrypted = oldEmails.map(decryptEmail);
+      
       await contact.save();
       
-      // If phones, emails, or addresses changed, also update Person and create UpdateEvents
-      if (changes.phones || changes.emails || changes.addresses) {
+      // If phones or emails changed, manage Person nodes and ContactEdges
+      if (changes.phones || changes.emails) {
         try {
-          // Import models
-          const Person = mongoose.models.Person || (await import("../../../models/Person")).default;
+          const { processContactChanges } = await import("../../../lib/personManager");
           const UpdateEvent = mongoose.models.UpdateEvent || (await import("../../../models/UpdateEvent")).default;
           const User = mongoose.models.User || (await import("../../../models/User")).default;
           
-          // Find Person by phone
-          const primaryPhone = contact.phones?.[0]?.value;
-          if (primaryPhone) {
-            const phoneE164 = '+' + primaryPhone.replace(/\D/g, '');
-            const person = await Person.findOne({
-              $or: [
-                { 'phones.e164': phoneE164 },
-                { 'phones.value': primaryPhone },
-              ],
-            });
-            
-            if (person) {
-              const fromUser = await User.findById(user.sub).lean();
-              const isStealth = fromUser?.stealthMode || false;
-              
-              // Update Person
-              if (changes.phones) {
-                person.phones = contact.phones.map((p: any) => ({
-                  label: p.label || 'mobile',
-                  value: p.value,
-                  e164: '+' + p.value.replace(/\D/g, ''),
-                }));
-              }
-              if (changes.emails) {
-                person.emails = contact.emails.map((e: any) => ({
-                  label: e.label || 'work',
-                  value: e.value.toLowerCase().trim(),
-                }));
-              }
-              if (changes.addresses) {
-                person.addresses = contact.addresses;
-              }
-              
-              // If person is registered, save directly
-              if (person.registeredUserId) {
-                await person.save();
-              } else {
-                // For non-registered, create UpdateEvent
+          // Get new values from request body (they're not encrypted yet, will be encrypted on save)
+          // But since we already saved, we need to decrypt them for comparison
+          const newPhones = (contact.phones || []).map(decryptPhone);
+          const newEmails = (contact.emails || []).map(decryptEmail);
+          
+          // Process Person node changes
+          // Decrypt notes if needed
+          let notesDecrypted = contact.notes || '';
+          if (notesDecrypted && typeof notesDecrypted === 'string' && notesDecrypted.match(/^[0-9a-f]{128,}$/i)) {
+            notesDecrypted = decrypt(notesDecrypted);
+          }
+          
+          const result = await processContactChanges(
+            contact._id.toString(),
+            user.sub,
+            oldPhonesDecrypted,
+            newPhones,
+            oldEmailsDecrypted,
+            newEmails,
+            contact.name,
+            notesDecrypted
+          );
+          
+          // Create UpdateEvents for network updates (if not stealth mode)
+          const fromUser = await User.findById(user.sub).lean();
+          const isStealth = fromUser?.stealthMode || false;
+          
+          if (!isStealth) {
+            for (const person of [...result.created, ...result.updated]) {
+              if (!person.registeredUserId) {
+                // Only create UpdateEvents for non-registered persons
                 for (const [field, change] of Object.entries(changes)) {
-                  if (['phones', 'emails', 'addresses'].includes(field)) {
+                  if (['phones', 'emails'].includes(field)) {
                     await UpdateEvent.create({
                       personId: person._id,
                       fromUserId: user.sub,
                       field,
                       oldValue: JSON.stringify(change.old),
                       newValue: JSON.stringify(change.new),
-                      stealth: !isStealth,
+                      stealth: false,
                       applied: false,
                     });
                   }
@@ -122,9 +164,38 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               }
             }
           }
+          
+          console.log(`Contact ${contact._id} updated:`, {
+            created: result.created.length,
+            updated: result.updated.length,
+            removed: result.removed.length,
+          });
         } catch (err) {
-          console.error('Failed to update Person or create UpdateEvent:', err);
+          console.error('Failed to process Person node changes:', err);
           // Don't fail the request, just log the error
+        }
+      }
+      
+      // If addresses changed, update Person addresses (if Person exists)
+      if (changes.addresses && !changes.phones && !changes.emails) {
+        try {
+          const Person = mongoose.models.Person || (await import("../../../models/Person")).default;
+          const ContactAlias = mongoose.models.ContactAlias || (await import("../../../models/ContactAlias")).default;
+          
+          // Find Person nodes linked to this contact
+          const aliases = await ContactAlias.find({
+            userId: user.sub,
+            alias: contact.name,
+          }).lean();
+          
+          // Update addresses for all linked Person nodes
+          for (const alias of aliases) {
+            await Person.findByIdAndUpdate(alias.personId, {
+              addresses: contact.addresses || [],
+            });
+          }
+        } catch (err) {
+          console.error('Failed to update Person addresses:', err);
         }
       }
       

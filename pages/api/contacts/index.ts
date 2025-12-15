@@ -25,8 +25,45 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           return res.status(403).json({ ok: false, code: "FORBIDDEN", message: "Not authorized to access other users' contacts" });
         }
       }
-      const contacts = await Contact.find({ userId }).lean();
-      return res.status(200).json(contacts);
+      // Fetch contacts (encrypted in storage)
+      const contacts = await Contact.find({ userId });
+      
+      // Decrypt only for the authorized user
+      const decryptedContacts = contacts.map((contact: any) => {
+        if (contact.decryptForUser) {
+          return contact.decryptForUser();
+        }
+        // Fallback: manual decryption
+        const doc = contact.toObject ? contact.toObject() : contact;
+        if (doc.encrypted !== false) {
+          const { decrypt } = require("../../../lib/encryption");
+          try {
+            if (doc.phones && Array.isArray(doc.phones)) {
+              doc.phones = doc.phones.map((p: any) => ({
+                ...p,
+                value: decrypt(p.value),
+              }));
+            }
+            if (doc.emails && Array.isArray(doc.emails)) {
+              doc.emails = doc.emails.map((e: any) => ({
+                ...e,
+                value: decrypt(e.value),
+              }));
+            }
+            if (doc.addresses && Array.isArray(doc.addresses)) {
+              doc.addresses = doc.addresses.map((addr: string) => decrypt(addr));
+            }
+            if (doc.notes) {
+              doc.notes = decrypt(doc.notes);
+            }
+          } catch (err) {
+            console.error('Decryption error:', err);
+          }
+        }
+        return doc;
+      });
+      
+      return res.status(200).json(decryptedContacts);
     }
     case "POST": {
       const { name, phones, emails, addresses, notes, linkedIn, twitter, instagram } = req.body;
@@ -39,21 +76,23 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         const ContactAlias = mongoose.models.ContactAlias || (await import("../../../models/ContactAlias")).default;
         const ContactEdge = mongoose.models.ContactEdge || (await import("../../../models/ContactEdge")).default;
         
-        // Helper function to normalize phone to e164 (US format)
-        const toE164 = (phone: string): string => {
+        // Helper function to normalize phone to e164
+        const toE164 = (phone: string, countryCode?: string): string => {
           const digits = phone.replace(/\D/g, '');
-          if (digits.startsWith('1') && digits.length === 11) {
+          // If already has country code
+          if (phone.trim().startsWith('+')) {
             return '+' + digits;
           }
-          if (digits.length === 10) {
-            return '+1' + digits;
-          }
-          return '+' + digits;
+          // Use provided country code or default to +91 (India)
+          const defaultCC = countryCode || '+91';
+          const ccDigits = defaultCC.replace(/\D/g, '');
+          return `+${ccDigits}${digits}`;
         };
         
         // Find or create Person based on phone/email
         const primaryPhone = phones[0].value;
-        const phoneE164 = toE164(primaryPhone);
+        const countryCode = phones[0].countryCode || '+91';
+        const phoneE164 = toE164(primaryPhone, countryCode);
         const emailValue = emails?.[0]?.value?.toLowerCase().trim();
         
         // Search for existing Person by phone or email
@@ -71,7 +110,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             phones: phones.map((p: any) => ({
               label: p.label || "mobile",
               value: p.value,
-              e164: toE164(p.value),
+              e164: toE164(p.value, p.countryCode || countryCode),
+              countryCode: p.countryCode || countryCode,
             })),
             emails: (emails || []).map((e: any) => ({
               label: e.label || "work",

@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "seed": "ts-node --transpile-only --project tsconfig.seed.json scripts/seed-comprehensive.ts",
+    "seed:js": "node scripts/seed-comprehensive.js"
   },
   "dependencies": {
     "@chakra-ui/icons": "^2.2.4",
@@ -31,12 +33,14 @@
   },
   "devDependencies": {
     "@netlify/plugin-nextjs": "^5.13.1",
-    "@types/node": "^24.3.1",
+    "@types/bcrypt": "^6.0.0",
+    "@types/node": "^24.10.4",
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.14",
+    "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
   }
 }

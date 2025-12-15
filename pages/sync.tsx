@@ -88,13 +88,23 @@ export default function SyncPage() {
         return;
       }
 
-      const res = await fetch('/api/sync', {
+      // Transform contacts to new format with phones/emails arrays
+      const transformedContacts = contacts.map((c: ContactItem) => ({
+        name: c.name,
+        phones: [{ label: 'mobile', value: c.phone }],
+        emails: c.email ? [{ label: 'work', value: c.email }] : [],
+        addresses: c.address ? [c.address] : [],
+        notes: c.company || '',
+      }));
+
+      // Use new encrypted import endpoint
+      const res = await fetch('/api/contacts/import', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ contacts }),
+        body: JSON.stringify({ contacts: transformedContacts }),
       });
 
       if (res.ok) {
@@ -224,7 +234,7 @@ export default function SyncPage() {
         <CardHeader>
           <Heading size="md">Import Contacts from File</Heading>
           <Text fontSize="sm" color="gray.500" mt={1}>
-            Upload a JSON file or paste JSON data to import contacts
+            Upload a JSON file or paste JSON data to import contacts. All sensitive data (phones, emails, addresses, notes) will be automatically encrypted.
           </Text>
         </CardHeader>
         <CardBody>

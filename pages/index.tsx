@@ -190,10 +190,30 @@ export default function HomePage() {
 
   async function addContact(e: React.FormEvent) {
     e.preventDefault();
-    if (!newAlias || (!newPhone && !newEmail)) {
+    if (!newAlias) {
       toast({
         title: "Validation Error",
-        description: "Please provide a name and at least one phone or email.",
+        description: "Name is required.",
+        status: "warning",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+    if (newPhone && newPhone.length !== 10) {
+      toast({
+        title: "Validation Error",
+        description: "Phone number must be exactly 10 digits.",
+        status: "warning",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+    if (!newPhone && !newEmail) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide at least one phone or email.",
         status: "warning",
         duration: 3000,
         isClosable: true,
@@ -208,7 +228,10 @@ export default function HomePage() {
         return;
       }
       const payload: any = { name: newAlias };
-      if (newPhone) payload.phones = [{ value: newPhone, label: "mobile" }];
+      // Combine country code +91 with phone number
+      if (newPhone) {
+        payload.phones = [{ value: `+91${newPhone}`, label: "mobile", countryCode: "+91" }];
+      }
       if (newEmail) payload.emails = [{ value: newEmail, label: "work" }];
       const resp = await fetch("/api/contacts", {
         method: "POST",
@@ -559,14 +582,38 @@ export default function HomePage() {
                     onChange={(e) => setNewAlias(e.target.value)}
                   />
                 </FormControl>
-                <FormControl>
-                  <FormLabel>Phone</FormLabel>
+                <FormControl isRequired>
+                  <FormLabel>Country Code</FormLabel>
+                  <HStack>
+                    <Box fontSize="2xl">🇮🇳</Box>
+                    <Input
+                      type="text"
+                      value="+91"
+                      readOnly
+                      maxW="80px"
+                      bg="gray.100"
+                    />
+                  </HStack>
+                </FormControl>
+                <FormControl isRequired>
+                  <FormLabel>Phone Number (10 digits)</FormLabel>
                   <Input
                     type="tel"
-                    placeholder="+1 (555) 123-4567"
+                    placeholder="9876543210"
                     value={newPhone}
-                    onChange={(e) => setNewPhone(e.target.value)}
+                    onChange={(e) => {
+                      // Only allow digits, max 10
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setNewPhone(digits);
+                    }}
+                    maxLength={10}
+                    pattern="[0-9]{10}"
                   />
+                  {newPhone && newPhone.length !== 10 && (
+                    <Text fontSize="xs" color="red.500" mt={1}>
+                      Phone number must be exactly 10 digits
+                    </Text>
+                  )}
                 </FormControl>
                 <FormControl>
                   <FormLabel>Email</FormLabel>
