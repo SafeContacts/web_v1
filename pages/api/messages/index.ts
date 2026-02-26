@@ -47,7 +47,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             const alias = await ContactAlias.findOne({
               userId: user.sub,
               personId: toPersonId,
-            }).lean();
+            }).lean() as { alias?: string } | null | undefined;
             
             return {
               ...log,

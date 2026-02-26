@@ -1,5 +1,5 @@
 //*** File: safecontacts/lib/trustAlgorithms.ts
-import { TrustEdge } from '../models/TrustEdge';
+import TrustEdge from '../models/TrustEdge';
 
 /**
  * Helper to build a trust adjacency matrix and list of unique user IDs.
@@ -45,30 +45,30 @@ export async function computePageRank(
   const { users, adjacency } = await buildTrustAdjacency();
   const n = users.length;
   if (n === 0) return {};
-  const outDegree = adjacency.map((row) => row.reduce((acc, v) => acc  v, 0));
+  const outDegree = adjacency.map((row) => row.reduce((acc, v) => acc + v, 0));
   let ranks = Array(n).fill(1 / n);
   let newRanks = Array(n).fill(0);
   const incoming: number[][] = Array.from({ length: n }, () => []);
-  for (let i = 0; i < n; i) {
-    for (let j = 0; j < n; j) {
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
       if (adjacency[j][i] > 0) {
         incoming[i].push(j);
       }
     }
   }
-  for (let iter = 0; iter < maxIter; iter) {
+  for (let iter = 0; iter < maxIter; iter++) {
     let diff = 0;
-    for (let i = 0; i < n; i) {
+    for (let i = 0; i < n; i++) {
       let rankSum = 0;
       incoming[i].forEach((j) => {
         const deg = outDegree[j] || n;
-        rankSum = ranks[j] / deg;
+        rankSum += ranks[j] / deg;
       });
-      newRanks[i] = (1 - damping) / n  damping * rankSum;
+      newRanks[i] = (1 - damping) / n + damping * rankSum;
     }
     diff = 0;
-    for (let i = 0; i < n; i) {
-      diff = Math.abs(newRanks[i] - ranks[i]);
+    for (let i = 0; i < n; i++) {
+      diff += Math.abs(newRanks[i] - ranks[i]);
     }
     ranks = newRanks.slice();
     if (diff < tolerance) break;

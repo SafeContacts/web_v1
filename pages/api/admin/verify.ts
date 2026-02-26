@@ -16,7 +16,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const userDoc = await User.findById(user.sub).lean();
+    const userDoc = await User.findById(user.sub).lean() as { role?: string } | null | undefined;
     if (!userDoc) {
       return res.status(404).json({ ok: false, code: 'NOT_FOUND', message: 'User not found' });
     }

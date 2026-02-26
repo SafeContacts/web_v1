@@ -37,7 +37,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Get the contact
-    const contact = await Contact.findById(id).lean();
+    const contact = await Contact.findById(id).lean() as { userId?: string; phones?: { value?: string }[]; emails?: { value?: string }[] } | null | undefined;
     if (!contact) {
       return res.status(404).json({ ok: false, code: 'NOT_FOUND', message: 'Contact not found' });
     }
@@ -106,7 +106,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     } else {
       // For non-registered users, create UpdateEvent for network
       // Get user's stealth mode
-      const fromUser = await User.findById(user.sub).lean();
+      const fromUser = await User.findById(user.sub).lean() as { stealthMode?: boolean } | null | undefined;
       const isStealth = fromUser?.stealthMode || false;
 
       // Update the Contact first

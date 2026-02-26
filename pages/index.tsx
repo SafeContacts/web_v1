@@ -39,7 +39,7 @@ import {
   Progress,
   Avatar,
 } from "@chakra-ui/react";
-import { SearchIcon, AddIcon, RepeatIcon, PhoneIcon, EmailIcon, BuildingIcon, ViewIcon } from "@chakra-ui/icons";
+import { SearchIcon, AddIcon, RepeatIcon, PhoneIcon, EmailIcon, ViewIcon } from "@chakra-ui/icons";
 
 interface Contact {
   _id: string;
@@ -521,7 +521,7 @@ export default function HomePage() {
                     )}
                     {company && (
                       <HStack spacing={2} color="gray.600">
-                        <BuildingIcon w={4} h={4} />
+                        <ViewIcon w={4} h={4} />
                         <Text fontSize="sm" noOfLines={1}>
                           {company}
                         </Text>

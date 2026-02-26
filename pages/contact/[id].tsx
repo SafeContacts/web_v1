@@ -31,7 +31,7 @@ import {
   AlertIcon,
   Text,
 } from "@chakra-ui/react";
-import { ArrowBackIcon, PhoneIcon, EmailIcon, BuildingIcon, EditIcon } from "@chakra-ui/icons";
+import { ArrowBackIcon, PhoneIcon, EmailIcon, ViewIcon, EditIcon } from "@chakra-ui/icons";
 
 interface Contact {
   _id: string;
@@ -323,7 +323,7 @@ export default function ContactDetailPage() {
                         Company
                       </FormLabel>
                       <HStack spacing={3}>
-                        <BuildingIcon color="gray.400" />
+                        <ViewIcon color="gray.400" />
                         <Text fontSize="md">{contact.company}</Text>
                       </HStack>
                     </Box>

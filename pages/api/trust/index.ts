@@ -43,7 +43,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     case "GET": {
       try {
         // Find the caller's personId via the User document
-        const caller = await User.findById(user.sub).lean();
+        const caller = await User.findById(user.sub).lean() as { personId?: unknown } | null | undefined;
         if (!caller || !caller.personId) {
           return res.status(404).json({ ok: false, code: "NOT_FOUND", message: "Person not found for user" });
         }
@@ -72,7 +72,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return res.status(400).json({ ok: false, code: "VALIDATION_ERROR", message: "toPersonId is required" });
       }
       try {
-        const caller = await User.findById(user.sub).lean();
+        const caller = await User.findById(user.sub).lean() as { personId?: unknown } | null | undefined;
         if (!caller || !caller.personId) {
           return res.status(404).json({ ok: false, code: "NOT_FOUND", message: "Person not found for user" });
         }

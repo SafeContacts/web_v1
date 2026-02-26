@@ -21,7 +21,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     switch (method) {
       case 'GET': {
-        const userDoc = await User.findById(user.sub).lean();
+        const userDoc = await User.findById(user.sub).lean() as Record<string, unknown> | null | undefined;
         if (!userDoc) {
           return res.status(404).json({ ok: false, code: 'NOT_FOUND', message: 'User not found' });
         }

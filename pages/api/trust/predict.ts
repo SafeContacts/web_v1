@@ -1,6 +1,6 @@
 //*** Add File: safecontacts/pages/api/trust/predict.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToDatabase } from '../../../lib/db';
+import { connect } from '../../../lib/mongodb';
 import { predictMissingTrustEdges } from '../../../lib/trustAlgorithms';
 
 // API endpoint that uses matrix factorization to infer potential trust edges.
@@ -11,7 +11,7 @@ import { predictMissingTrustEdges } from '../../../lib/trustAlgorithms';
 //   lr: learning rate for training (default 0.01)
 //   lambda: regularization parameter (default 0.02)
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  await connectToDatabase();
+  await connect();
   const { k, steps, top, lr, lambda } = req.query;
   const latentFactors = k ? parseInt(k as string, 10) : undefined;
   const iterations = steps ? parseInt(steps as string, 10) : undefined;

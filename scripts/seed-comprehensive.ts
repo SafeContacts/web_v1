@@ -73,6 +73,7 @@ function randomEmail(name: string): string {
 async function seed() {
   console.log('🌱 Starting comprehensive seed...');
   
+  if (!MONGODB_URI) throw new Error('MONGODB_URI is required');
   await mongoose.connect(MONGODB_URI, {});
   console.log('✅ Connected to MongoDB');
 

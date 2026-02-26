@@ -86,7 +86,6 @@ export default function Layout({ children }: LayoutProps) {
       {/* Modern Header */}
       <Box
         as="header"
-        bg={bgHeader}
         borderBottomWidth="1px"
         borderColor={borderColor}
         position="sticky"

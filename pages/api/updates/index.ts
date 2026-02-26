@@ -27,16 +27,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     .limit(50)
     .lean();
 
-  // Populate contact's name/phone and filter by user's contacts if userId provided
-  const withContact = await Promise.all(events.map(async (e) => {
-    const c = await Contact.findById(e.contactId).lean();
-    // Filter by userId if provided
+  type EventDoc = { _id: unknown; contactId: unknown; field?: string; oldValue?: string; newValue?: string; createdAt?: Date };
+  const withContact = await Promise.all((events as EventDoc[]).map(async (e) => {
+    const c = await Contact.findById(e.contactId).lean() as { userId?: string; name?: string } | null | undefined;
     if (userId && c && c.userId !== userId) {
       return null;
     }
     return {
-      id: e._id.toString(),
-      contactId: e.contactId.toString(),
+      id: String(e._id),
+      contactId: String(e.contactId),
       contactName: c?.name || 'Unknown',
       field: e.field,
       oldValue: e.oldValue,

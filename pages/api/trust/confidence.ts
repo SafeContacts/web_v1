@@ -24,9 +24,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 */
 
 // File :: pages/api/trust/confidence.ts
-import { TrustEdge } from '../models/TrustEdge';
-import { CallLog } from '../models/CallLog';
-import { Contact } from '../models/Contact';
+import TrustEdge from '../../../models/TrustEdge';
+import CallLog from '../../../models/CallLog';
+import Contact from '../../../models/Contact';
 import { spamNumbers } from './spamList';
 
 /**
@@ -66,7 +66,7 @@ export async function computeAdvancedConfidenceScore(contactUserId: string, user
   // Determine spam penalty by looking up the contact's primary phone number.
   let spamPenalty = 0;
   try {
-    const contact = await Contact.findOne({ userId: contactUserId }).lean();
+    const contact = await Contact.findOne({ userId: contactUserId }).lean() as { phones?: { value?: string }[] } | null | undefined;
     const primaryPhone = contact?.phones?.[0]?.value?.replace(/\D/g, '');
     if (primaryPhone && spamNumbers.has(primaryPhone)) {
       spamPenalty = -30;

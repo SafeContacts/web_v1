@@ -54,6 +54,22 @@ export default function ContactCard({ contact, userId }: ContactCardProps) {
 }*/
 
 import Link from "next/link";
+
+export interface Contact {
+  _id?: string;
+  id?: string;
+  name?: string;
+  phone?: string;
+  phones?: { value?: string }[];
+  email?: string;
+  emails?: { value?: string }[];
+  company?: string;
+  trustScore?: number;
+  tags?: unknown[];
+  updatedAt?: string | Date;
+  [key: string]: unknown;
+}
+
 export interface ContactCardProps {
   contact: any;
 }

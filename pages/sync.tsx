@@ -24,7 +24,7 @@ import {
   HStack,
   IconButton,
 } from '@chakra-ui/react';
-import { RepeatIcon, UploadIcon, CloseIcon } from '@chakra-ui/icons';
+import { RepeatIcon, AddIcon, CloseIcon } from '@chakra-ui/icons';
 
 type ContactItem = {
   phone: string;
@@ -280,7 +280,7 @@ export default function SyncPage() {
             </Box>
 
             <Button
-              leftIcon={<UploadIcon />}
+              leftIcon={<AddIcon />}
               onClick={handleFileUpload}
               isLoading={loading}
               loadingText="Importing..."

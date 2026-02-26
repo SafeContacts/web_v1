@@ -1,6 +1,6 @@
 //*** File: safecontacts/pages/api/trust/pagerank.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToDatabase } from '../../../lib/db';
+import { connect } from '../../../lib/mongodb';
 import { computePageRank } from '../../../lib/trustAlgorithms';
 
 /**
@@ -8,7 +8,7 @@ import { computePageRank } from '../../../lib/trustAlgorithms';
  * Returns an object mapping userId to PageRank score. Scores sum to 1.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  await connectToDatabase();
+  await connect();
   const { damping, maxIter, tolerance } = req.query;
   const d = damping ? parseFloat(damping as string) : undefined;
   const maxI = maxIter ? parseInt(maxIter as string, 10) : undefined;

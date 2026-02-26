@@ -29,7 +29,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     // Get caller's personId
-    const caller = await User.findById(user.sub).lean();
+    const caller = await User.findById(user.sub).lean() as { personId?: unknown } | null | undefined;
     if (!caller || !caller.personId) {
       return res.status(404).json({ ok: false, code: 'NOT_FOUND', message: 'Person not found for user' });
     }
@@ -49,9 +49,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }).lean();
 
     // Filter out users in stealth mode
-    const nonStealthUserIds = firstLevelUsers
-      .filter((u) => !u.stealthMode) // stealthMode field from User model
-      .map((u) => u._id.toString());
+    const users = firstLevelUsers as { _id: unknown; stealthMode?: boolean }[];
+    const nonStealthUserIds = users
+      .filter((u) => !u.stealthMode)
+      .map((u) => String(u._id));
 
     // Get updates from non-stealth 1st level connections
     // Updates are for persons that the caller has in their network
@@ -89,27 +90,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       .populate('personId', 'phones emails')
       .lean();
     const fromUserMap: Record<string, any> = {};
-    fromUsers.forEach((u) => {
-      fromUserMap[u._id.toString()] = u;
+    (fromUsers as { _id: unknown }[]).forEach((u) => {
+      fromUserMap[String(u._id)] = u;
     });
 
-    // Build response with enriched data
-    const enrichedUpdates = updates.map((update) => {
-      const person = personMap[update.personId?.toString() || ''];
-      const fromUser = fromUserMap[update.fromUserId];
+    type UpdateDoc = { _id: unknown; personId?: unknown; fromUserId?: string; field?: string; oldValue?: string; newValue?: string; createdAt?: Date };
+    const enrichedUpdates = (updates as UpdateDoc[]).map((update) => {
+      const person = personMap[String(update.personId || '')];
+      const fromUser = fromUserMap[update.fromUserId || ''];
       const fromPerson = fromUser?.personId;
 
       return {
-        id: update._id.toString(),
-        personId: update.personId?.toString(),
-        personName: aliasMap[update.personId?.toString() || ''] || person?.emails?.[0]?.value || person?.phones?.[0]?.value || 'Unknown',
+        id: String(update._id),
+        personId: update.personId != null ? String(update.personId) : undefined,
+        personName: aliasMap[String(update.personId || '')] || (person as any)?.emails?.[0]?.value || (person as any)?.phones?.[0]?.value || 'Unknown',
         fromUserId: update.fromUserId,
-        fromUserName: fromPerson?.emails?.[0]?.value || fromPerson?.phones?.[0]?.value || 'Unknown',
+        fromUserName: (fromPerson as any)?.emails?.[0]?.value || (fromPerson as any)?.phones?.[0]?.value || 'Unknown',
         field: update.field,
         oldValue: update.oldValue,
         newValue: update.newValue,
         createdAt: update.createdAt,
-        isRegistered: !!person?.registeredUserId,
+        isRegistered: !!(person as any)?.registeredUserId,
       };
     });
 

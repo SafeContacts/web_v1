@@ -23,12 +23,14 @@ export default function useContactsViewModel() {
     try {
       //const res = await api.get<UserContact[]>('/api/contacts');
       const token = localStorage.getItem("accessToken");
-      const res = fetch("/api/contacts", {
-	      headers: { Authorization: `Bearer ${token}` }});
-      setContacts(res.data);
+      const res = await fetch("/api/contacts", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setContacts(Array.isArray(data) ? data : data?.contacts ?? []);
     } catch (err: any) {
       console.error('Fetch contacts failed', err);
-      setError(err.response?.data?.error || err.message);
+      setError((err as any)?.response?.data?.error || (err as Error)?.message);
     } finally {
       setLoading(false);
     }

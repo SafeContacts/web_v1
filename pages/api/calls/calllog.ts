@@ -1,5 +1,4 @@
-
-*** Add File: pages/api/calllog/index.ts
+// Call and SMS logging API - pages/api/calls/calllog.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { withAuth } from "../../../lib/auth";
 import mongoose from "mongoose";

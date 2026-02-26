@@ -135,7 +135,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       
       // Create ContactAlias and ContactEdge if user has personId
       if (person) {
-        const userDoc = await User.findById(userId).lean();
+        const userDoc = await User.findById(userId).lean() as { personId?: unknown } | null | undefined;
         if (userDoc && userDoc.personId) {
           const fromPersonId = userDoc.personId;
           const toPersonId = person._id;

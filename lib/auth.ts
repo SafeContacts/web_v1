@@ -24,7 +24,7 @@ export async function authMiddleware(
   }
   try {
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
-    req.user = {
+    (req as NextApiRequest & { user?: { sub: string; role: string } }).user = {
       sub: decoded.sub,
       role: decoded.role || "user",
     };
@@ -39,7 +39,7 @@ export async function authMiddleware(
 // API handlers with this function to automatically add the user to the
 // request.
 export function withAuth(
-  handler: (req: NextApiRequest, res: NextApiResponse) => Promise<void>,
+  handler: (req: NextApiRequest, res: NextApiResponse) => Promise<void | NextApiResponse>,
 ) {
   // Wrap the given handler so that it only runs after the auth middleware
   // invokes the `next` callback.  This ensures that `req.user` is set

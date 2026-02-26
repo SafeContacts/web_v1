@@ -141,7 +141,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           );
           
           // Create UpdateEvents for network updates (if not stealth mode)
-          const fromUser = await User.findById(user.sub).lean();
+          const fromUser = await User.findById(user.sub).lean() as { stealthMode?: boolean } | null | undefined;
           const isStealth = fromUser?.stealthMode || false;
           
           if (!isStealth) {

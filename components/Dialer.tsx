@@ -7,7 +7,7 @@ interface DialerProps {
    * least one phone number. When a call is placed we will log the call
    * against the matching contact (if any).
    */
-  contacts?: { _id: string; name: string; phones: { value: string }[] }[];
+  contacts?: { _id?: string; name?: string; phones?: { value?: string }[] }[];
   /**
    * The current user's id. Used to match logs to the user. If omitted, logging
    * will still occur via the authenticated token on the server.
@@ -35,7 +35,7 @@ export default function Dialer({ contacts = [], userId }: DialerProps) {
   // forgiving.
   const normalized = number.replace(/\D/g, '');
   const results = contacts.filter((c) =>
-    c.phones.some((p) => p.value.replace(/\D/g, '').includes(normalized))
+    (c.phones ?? []).some((p) => (p?.value ?? '').replace(/\D/g, '').includes(normalized))
   );
 
   // Log an outgoing call via the /api/calllog endpoint. If a matching contact
@@ -106,7 +106,7 @@ export default function Dialer({ contacts = [], userId }: DialerProps) {
         <div style={{ marginTop: '1rem' }}>
           <h4>Matching Contacts</h4>
           {results.map((c) => (
-            <div key={c._id} style={{ padding: '0.5rem 0' }}> {c.name} – {c.phones[0]?.value} </div>
+            <div key={c._id} style={{ padding: '0.5rem 0' }}> {c.name} – {c.phones?.[0]?.value} </div>
           ))}
         </div>
       )}

@@ -142,10 +142,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         });
         
         // Get user's personId
-        const caller = await User.findById(user.sub).lean();
-        if (caller && caller.personId) {
+        const caller = await User.findById(user.sub).lean() as { personId?: unknown } | null | undefined;
+        if (caller && caller.personId && person) {
           const fromPersonId = caller.personId;
-          const toPersonId = person._id;
+          const toPersonId = (person as { _id: unknown })._id;
           
           // Create or update ContactAlias
           await ContactAlias.findOneAndUpdate(

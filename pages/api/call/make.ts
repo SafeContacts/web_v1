@@ -23,7 +23,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     // Check permissions
-    const permission = await Permission.findOne({ userId: user.sub }).lean();
+    const permission = await Permission.findOne({ userId: user.sub }).lean() as { permissions?: { makeCalls?: boolean } } | null | undefined;
     if (!permission?.permissions?.makeCalls) {
       return res.status(403).json({ ok: false, code: 'FORBIDDEN', message: 'Calling permission not granted' });
     }
@@ -35,7 +35,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Get caller's personId
-    const caller = await User.findById(user.sub).lean();
+    const caller = await User.findById(user.sub).lean() as { personId?: unknown } | null | undefined;
     if (!caller || !caller.personId) {
       return res.status(404).json({ ok: false, code: 'NOT_FOUND', message: 'Person not found for user' });
     }
@@ -44,7 +44,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Get target person
     let targetPersonId: any;
     if (toAliasId) {
-      const alias = await ContactAlias.findById(toAliasId).lean();
+      const alias = await ContactAlias.findById(toAliasId).lean() as { personId?: unknown } | null | undefined;
       if (!alias) {
         return res.status(404).json({ ok: false, code: 'NOT_FOUND', message: 'Alias not found' });
       }
@@ -82,7 +82,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Update trust score
     try {
-      const trustScore = await calculateTrustScoreFromInteractions(fromPersonId, targetPersonId, user.sub);
+      const fromId = fromPersonId instanceof mongoose.Types.ObjectId ? fromPersonId : new mongoose.Types.ObjectId(String(fromPersonId));
+      const toId = targetPersonId instanceof mongoose.Types.ObjectId ? targetPersonId : new mongoose.Types.ObjectId(String(targetPersonId));
+      const trustScore = await calculateTrustScoreFromInteractions(fromId, toId, user.sub);
       await Person.findByIdAndUpdate(targetPersonId, { $set: { trustScore } }, { upsert: false });
     } catch (err) {
       console.error('Failed to update trust score:', err);

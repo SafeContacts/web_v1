@@ -49,9 +49,18 @@ export default function NetworkGraph({ data }: { data: GraphData | null }) {
   // Find self node and center it
   const selfNode = data.nodes.find((n) => n.type === 'self');
   
-  // Handle both 'links' and 'edges' from API
-  const edgesOrLinks = data.links || data.edges || [];
-  
+  // Handle both 'links' and 'edges' from API (source/target may be string or object with id)
+  const edgesOrLinks = (data.links || data.edges || []) as Array<{
+    source: string | { id?: string };
+    target: string | { id?: string };
+    relation?: string;
+    weight?: number;
+    level?: number;
+    mutual?: boolean;
+  }>;
+  const toId = (v: string | { id?: string }): string =>
+    typeof v === 'string' ? v : (v?.id ?? String(v));
+
   // Transform data for react-force-graph-2d
   const graphData = {
     nodes: data.nodes.map((node) => ({
@@ -63,8 +72,8 @@ export default function NetworkGraph({ data }: { data: GraphData | null }) {
       fy: node.fy, // Fixed y position for centering
     })),
     links: edgesOrLinks.map((link) => ({
-      source: typeof link.source === 'string' ? link.source : link.source.id,
-      target: typeof link.target === 'string' ? link.target : link.target.id,
+      source: toId(link.source),
+      target: toId(link.target),
       relation: link.relation,
       weight: link.weight || 1,
       level: link.level,
@@ -140,29 +149,6 @@ export default function NetworkGraph({ data }: { data: GraphData | null }) {
         linkDirectionalParticleSpeed={0.005}
         linkDirectionalParticleWidth={3}
         cooldownTicks={150}
-        d3Force={(d3: any) => {
-          // Center force to keep graph centered
-          d3.force('center', d3.forceCenter(0, 0));
-          // Use stronger charge for self node to keep it central
-          d3.force('charge', d3.forceManyBody().strength((node: any) => {
-            return node.type === 'self' ? -800 : -200;
-          }));
-          // Link force for better edge layout with trust-based distances
-          d3.force('link', d3.forceLink().id((d: any) => d.id).distance((link: any) => {
-            if (link.relation === 'trust') return 100;
-            // Level 1 direct connections
-            if (link.level === 1) {
-              // Distance based on trust score: higher trust = closer (50-150 range)
-              // Trust score 0-100, invert so higher trust = lower distance
-              const trustScore = link.trustScore || 0;
-              // Map trust score to distance: 100 trust = 50 distance, 0 trust = 150 distance
-              const distance = 150 - (trustScore * 1.0); // 150 - 0 = 150 (far), 150 - 100 = 50 (close)
-              return Math.max(50, Math.min(150, distance)); // Clamp between 50-150
-            }
-            // Other connections (level 2+) are further away
-            return 200;
-          }));
-        }}
         onNodeDrag={(node: any) => {
           // Prevent dragging the self node
           if (node.type === 'self') {

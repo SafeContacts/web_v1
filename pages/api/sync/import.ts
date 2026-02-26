@@ -62,8 +62,8 @@ export default requireAuth(async function handler(req: NextApiRequest, res: Next
   await UserActivity.create({ userId, type:'import' }); // or 'import', 'apply_network'
 
   // emit to this user that new deltas arrived
-  const io = (res.socket.server as any).io as IOServer;
-  io.to(userId).emit('sync:import', deltas);
+  const io = (res as any).socket?.server?.io;
+  if (io) io.to(userId).emit('sync:import', deltas);
 
   return res.status(200).json(deltas);
 });

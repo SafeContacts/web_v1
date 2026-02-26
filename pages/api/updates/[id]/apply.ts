@@ -37,7 +37,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Verify user has permission (should be a 1st level connection)
-    const caller = await User.findById(user.sub).lean();
+    const caller = await User.findById(user.sub).lean() as { personId?: unknown } | null | undefined;
     if (!caller || !caller.personId) {
       return res.status(404).json({ ok: false, code: 'NOT_FOUND', message: 'Person not found for user' });
     }

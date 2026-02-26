@@ -17,21 +17,21 @@ function levenshtein(a: string, b: string): number {
   const matrix: number[][] = [];
   const lenA = a.length;
   const lenB = b.length;
-  for (let i = 0; i <= lenA; i) {
+  for (let i = 0; i <= lenA; i++) {
     matrix[i] = [i];
   }
-  for (let j = 0; j <= lenB; j) {
+  for (let j = 0; j <= lenB; j++) {
     matrix[0][j] = j;
   }
-  for (let i = 1; i <= lenA; i) {
-    for (let j = 1; j <= lenB; j) {
+  for (let i = 1; i <= lenA; i++) {
+    for (let j = 1; j <= lenB; j++) {
       if (a.charAt(i - 1) === b.charAt(j - 1)) {
         matrix[i][j] = matrix[i - 1][j - 1];
       } else {
         matrix[i][j] = Math.min(
-          matrix[i - 1][j]  1,
-          matrix[i][j - 1]  1,
-          matrix[i - 1][j - 1]  1
+          matrix[i - 1][j] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j - 1] + 1
         );
       }
     }

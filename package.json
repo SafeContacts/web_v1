@@ -10,6 +10,8 @@
     "seed:js": "node scripts/seed-comprehensive.js"
   },
   "dependencies": {
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
     "@chakra-ui/icons": "^2.2.4",
     "@chakra-ui/react": "^2.5.1",
     "@emotion/react": "^11.11.0",
@@ -32,8 +34,10 @@
     "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.1.0",
     "@netlify/plugin-nextjs": "^5.13.1",
     "@types/bcrypt": "^6.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.10.4",
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",

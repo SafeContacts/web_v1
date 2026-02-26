@@ -25,7 +25,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const caller = await User.findById(user.sub).lean();
+    const caller = await User.findById(user.sub).lean() as { personId?: unknown } | null | undefined;
     if (!caller || !caller.personId) {
       return res.status(404).json({ ok: false, code: "NOT_FOUND", message: "Person not found for user" });
     }
@@ -40,7 +40,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
 
         // Check if user is blocked
-        const toPerson = await Person.findById(toPersonId).lean();
+        const toPerson = await Person.findById(toPersonId).lean() as { phones?: { value?: string; e164?: string }[] } | null | undefined;
         if (toPerson) {
           const isBlocked = await BlockedContact.findOne({
             userId: user.sub,
@@ -163,7 +163,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           );
 
           // Create ContactAlias for the requester (so they can see the contact)
-          const toPerson = await Person.findById(request.toPersonId).lean();
+          const toPerson = await Person.findById(request.toPersonId).lean() as { phones?: { value?: string }[]; emails?: { value?: string }[] } | null | undefined;
           if (toPerson) {
             const aliasName = toPerson.emails?.[0]?.value || toPerson.phones?.[0]?.value || "Contact";
             await ContactAlias.findOneAndUpdate(
@@ -230,7 +230,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             const alias = await ContactAlias.findOne({
               userId: user.sub,
               personId: otherPersonId,
-            }).lean();
+            }).lean() as { alias?: string } | null | undefined;
 
             // For incoming requests, get connection path and full sender details
             let connectionPath = null;
@@ -238,9 +238,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
             if (isIncoming) {
               // Get connection path details
+              const fromId = fromPersonId instanceof mongoose.Types.ObjectId ? fromPersonId : new mongoose.Types.ObjectId(String(fromPersonId));
+              const toId = fromPerson._id instanceof mongoose.Types.ObjectId ? fromPerson._id : new mongoose.Types.ObjectId(String((fromPerson as { _id: unknown })._id));
               connectionPath = await getConnectionPathDetails(
-                fromPersonId,
-                fromPerson._id,
+                fromId,
+                toId,
                 user.sub,
                 2
               );

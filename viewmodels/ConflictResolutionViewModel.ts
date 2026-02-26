@@ -49,7 +49,7 @@ export default function useConflictResolutionViewModel() {
     }
   }, []);
 
-  useEffect(fetchGroups, [fetchGroups]);
+  useEffect(() => { fetchGroups(); }, [fetchGroups]);
 
   useEffect(() => {
     if (!socket) return;

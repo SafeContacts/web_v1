@@ -114,7 +114,7 @@ export async function linkContactToPerson(
   notes: string = ''
 ): Promise<void> {
   // Get user's personId
-  const user = await User.findById(userId).lean();
+  const user = await User.findById(userId).lean() as { personId?: unknown } | null | undefined;
   if (!user || !user.personId) {
     throw new Error('User does not have a Person node');
   }
@@ -146,7 +146,7 @@ export async function unlinkContactFromPerson(
   personId: any,
   userId: string
 ): Promise<void> {
-  const user = await User.findById(userId).lean();
+  const user = await User.findById(userId).lean() as { personId?: unknown } | null | undefined;
   if (!user || !user.personId) {
     return;
   }
@@ -169,7 +169,7 @@ export async function getContactPersonNodes(
   userId: string
 ): Promise<any[]> {
   // Find all ContactAliases for this contact's alias name
-  const contact = await mongoose.models.Contact.findById(contactId).lean();
+  const contact = await mongoose.models.Contact.findById(contactId).lean() as { name?: string } | null | undefined;
   if (!contact) return [];
 
   const aliases = await ContactAlias.find({
@@ -177,7 +177,7 @@ export async function getContactPersonNodes(
     alias: contact.name,
   }).lean();
 
-  const personIds = aliases.map((a) => a.personId);
+  const personIds = (aliases as { personId?: unknown }[]).map((a) => a.personId);
   if (personIds.length === 0) return [];
 
   return await Person.find({ _id: { $in: personIds } }).lean();
@@ -263,4 +263,7 @@ export async function processContactChanges(
 
   return { created, removed, updated };
 }
+
+
+
 

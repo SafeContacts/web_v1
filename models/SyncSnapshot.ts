@@ -15,13 +15,15 @@ export interface ISyncSnapshot extends Document {
   updatedAt: Date;
 }
 
-const SyncSnapshotSchema = new Schema<ISyncSnapshot>(
+const SyncSnapshotSchema = new Schema(
   {
     userId: { type: String, required: true, unique: true, index: true },
-    contacts: { type: Array, default: [] },
+    contacts: { type: [Schema.Types.Mixed], default: [] },
   },
   { timestamps: true }
 );
 
-export const SyncSnapshot: Model<ISyncSnapshot> =
+const SyncSnapshotModel: Model<ISyncSnapshot> =
   mongoose.models.SyncSnapshot || mongoose.model<ISyncSnapshot>('SyncSnapshot', SyncSnapshotSchema);
+export const SyncSnapshot = SyncSnapshotModel;
+export default SyncSnapshotModel;

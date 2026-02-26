@@ -12,7 +12,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   // Verify admin role
-  const userDoc = await User.findById(user.sub).lean();
+  const userDoc = await User.findById(user.sub).lean() as { role?: string } | null | undefined;
   if (!userDoc || userDoc.role !== 'admin') {
     return res.status(403).json({ ok: false, code: 'FORBIDDEN', message: 'Admin access required' });
   }

@@ -25,8 +25,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // 3) Fetch Contact docs (alive + metadata)
   const contacts = await Contact.find({ _id: { $in: Array.from(ids) } }).lean();
 
-  const nodes = contacts.map(c => ({
-    id:            c._id.toString(),
+  const nodes = (contacts as { _id: unknown; name?: string; isRegistered?: boolean; tags?: unknown[]; confidenceScore?: number }[]).map(c => ({
+    id:            String(c._id),
     name:          c.name,
     isRegistered:  c.isRegistered,
     tags:          c.tags,

@@ -40,14 +40,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         
         return res.status(200).json({
           ok: true,
-          permissions: permission.permissions,
+          permissions: (permission as { permissions?: unknown })?.permissions ?? {},
         });
       }
       
       case 'PUT': {
         // Update permissions (admin only or self)
         const { permissions } = req.body;
-        const userDoc = await User.findById(user.sub).lean();
+        const userDoc = await User.findById(user.sub).lean() as { role?: string } | null | undefined;
         
         if (!userDoc) {
           return res.status(404).json({ ok: false, code: 'NOT_FOUND', message: 'User not found' });

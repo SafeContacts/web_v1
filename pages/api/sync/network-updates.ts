@@ -3,7 +3,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { requireAuth }      from '../../../src/middleware/requireAuth';
 import { connect }          from '../../../lib/mongodb';
-import SyncSnapshot         from '../../../models/SyncSnapshot';
+import SyncSnapshot from '../../../models/SyncSnapshot';
 import UpdateEvent          from '../../../models/UpdateEvent';
 import TrustEdge            from '../../../models/TrustEdge';
 import UserActivity         from '../../../models/UserActivity';

@@ -19,7 +19,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     // Check permissions
-    const permission = await Permission.findOne({ userId: user.sub }).lean();
+    const permission = await Permission.findOne({ userId: user.sub }).lean() as { permissions?: { sendEmails?: boolean } } | null | undefined;
     if (!permission?.permissions?.sendEmails) {
       return res.status(403).json({ ok: false, code: 'FORBIDDEN', message: 'Email permission not granted' });
     }
@@ -35,7 +35,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Get target person
-    const targetPerson = await Person.findById(toPersonId).lean();
+    const targetPerson = await Person.findById(toPersonId).lean() as { emails?: { value?: string }[] } | null | undefined;
     if (!targetPerson) {
       return res.status(404).json({ ok: false, code: 'NOT_FOUND', message: 'Person not found' });
     }

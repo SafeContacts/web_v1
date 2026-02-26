@@ -16,7 +16,7 @@ import {
   HStack,
   Spinner,
 } from '@chakra-ui/react';
-import { UploadIcon } from '@chakra-ui/icons';
+import { AddIcon } from '@chakra-ui/icons';
 
 export default function ContactImport() {
   const [jsonInput, setJsonInput] = useState('');
@@ -141,7 +141,7 @@ export default function ContactImport() {
           />
 
           <Button
-            leftIcon={<UploadIcon />}
+            leftIcon={<AddIcon />}
             onClick={handleImport}
             isLoading={loading}
             loadingText="Importing..."

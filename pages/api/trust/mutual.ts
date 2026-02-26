@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { connect }             from '../../../lib/mongodb';
 import TrustEdge               from '../../../models/TrustEdge';
-import { Contact } from '../../../models/Contact';
+import Contact from '../../../models/Contact';
 import { computeConfidenceScore } from '../../../lib/confidenceScore';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -22,15 +22,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 	}
 
   if (req.method === 'POST') {
-		let edge = await TrustEdge.findOne({ fromUserId, toUserId });
+    const { fromUserId, toUserId, confirm } = (req.body || {}) as { fromUserId?: string; toUserId?: string; confirm?: boolean };
+    if (!fromUserId || !toUserId) return res.status(400).json({ error: 'fromUserId & toUserId required' });
+		let edge = await TrustEdge.findOne({ fromPersonId: fromUserId, toPersonId: toUserId });
       if (edge) {
-        // If confirm is provided, update confirmed status
         if (confirm !== undefined) {
-          edge.confirmed = !!confirm;
+          (edge as any).confirmed = !!confirm;
           await edge.save();
         }
       } else {
-        edge = await TrustEdge.create({ fromUserId, toUserId, confirmed: !!confirm });
+        edge = await TrustEdge.create({ fromPersonId: fromUserId, toPersonId: toUserId, level: 1 });
       }
       // After creating or updating a trust edge, recompute trust scores for both parties.
       try {

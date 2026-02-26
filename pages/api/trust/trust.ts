@@ -1,11 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToDatabase } from '../../../lib/db';
-import { TrustEdge } from '../../../models/TrustEdge';
-import { Contact } from '../../../models/Contact';
+import { connect } from '../../../lib/mongodb';
+import TrustEdge from '../../../models/TrustEdge';
+import Contact from '../../../models/Contact';
 import { computeAdvancedConfidenceScore } from '../../../lib/confidenceScore';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  await connectToDatabase();
+  await connect();
   const { method } = req;
   switch (method) {
     case 'GET': {

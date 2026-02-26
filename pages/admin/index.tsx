@@ -60,30 +60,21 @@ export default function AdminDashboard() {
         router.push("/login");
         return;
       }
-      const metricsResp = fetch("/api/admin/metrics", {
+      const metricsResp = await fetch("/api/admin/metrics", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      /* const activityResp = fetch(`/api/admin/activity?days=${range}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });*/
-      const [mResp, aResp] = await Promise.all([metricsResp, activityResp]);
-      if (mResp.status === 401 || aResp.status === 401) {
+      if (metricsResp.status === 401) {
         router.push("/login");
         return;
       }
-      if (!mResp.ok) {
-        const err = await mResp.json();
+      if (!metricsResp.ok) {
+        const err = await metricsResp.json();
         throw new Error(err.message || "Failed to load metrics");
       }
-      if (!aResp.ok) {
-        const err = await aResp.json();
-        throw new Error(err.message || "Failed to load activity");
-      }
-      const metricsData: RawMetrics = await mResp.json();
-      const activityData = await aResp.json();
+      const metricsData: RawMetrics = await metricsResp.json();
       setMetrics(metricsData);
-      setDays(activityData.days || []);
-      setContributors(activityData.topContributors || []);
+      setDays([]);
+      setContributors([]);
       setError(null);
     } catch (e: any) {
       setError(e.message);

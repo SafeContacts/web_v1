@@ -2,7 +2,7 @@
 import React from "react";
 import { Menu, MenuButton, MenuList, MenuItem, Button, Icon } from "@chakra-ui/react";
 import { PhoneIcon } from "@chakra-ui/icons";
-import { buildWhatsAppChatUrl, buildWhatsAppCallUrl } from "lib/deeplinks";
+import { buildWhatsAppChatUrl, buildWhatsAppCallUrl } from "../lib/deeplinks";
 import { toE164 } from "../lib/phone";
 
 
