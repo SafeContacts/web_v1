@@ -5,3 +5,12 @@
 
 [build.environment]
   NODE_VERSION = "18"
+  # Omit non-secret keys whose values cause false positives in secrets scanning:
+  # - NEXT_PUBLIC_CASHFREE_APP_ID: public app identifier (not used in code; should be removed from Netlify env vars)
+  # - NEXT_PUBLIC_WABA_ENABLED: boolean feature flag, not a secret
+  # - CASHFREE_ENV: environment name like "production"/"sandbox", matches broadly
+  # - NODE_VERSION: short version string, matches broadly
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_CASHFREE_APP_ID,NEXT_PUBLIC_WABA_ENABLED,CASHFREE_ENV,NODE_VERSION"
+  # Omit server-side build artifacts that are not publicly accessible but contain
+  # env var references (Next.js standalone output, webpack cache, Netlify build dir)
+  SECRETS_SCAN_OMIT_PATHS = ".next/standalone,.next/cache,.next/required-server-files.json,.netlify"
