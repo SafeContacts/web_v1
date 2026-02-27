@@ -9,12 +9,31 @@ import { signToken } from '../../../src/lib/jwt';
 import { setRefreshToken } from '../../../src/lib/cookies';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  await connect();
   if (req.method !== 'POST') return res.status(405).end();
   const { phone, password, name } = req.body;
   if (!phone || !password || !name) {
     return res.status(400).json({ error: 'phone, password & name required' });
   }
+
+  try {
+    await connect();
+  } catch (err: any) {
+    console.error('[register] DB connect failed:', err?.message || err);
+    return res.status(503).json({
+      error: 'Database unavailable',
+      message: process.env.MONGODB_URI ? 'Connection failed. Check MONGODB_URI and network.' : 'MONGODB_URI is not set. Add it in Netlify: Site settings → Environment variables.',
+    });
+  }
+
+  if (!process.env.JWT_SECRET) {
+    console.error('[register] JWT_SECRET not set');
+    return res.status(503).json({
+      error: 'Server misconfiguration',
+      message: 'JWT_SECRET is not set. Add it in Netlify: Site settings → Environment variables.',
+    });
+  }
+
+  try {
   if (await User.findOne({ phone })) {
     return res.status(409).json({ error: 'User exists' });
   }
@@ -69,6 +88,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const refreshToken = signToken({ sub: user._id }, '7d');
   setRefreshToken(res, refreshToken);
   res.status(201).json({ accessToken });
+  } catch (err: any) {
+    console.error('[register] Error:', err?.message || err);
+    return res.status(500).json({
+      error: 'Registration failed',
+      message: err?.message || 'Unknown error. Check server logs.',
+    });
+  }
 /*+    // Generate JWT for the new user
 +    const payload = { sub: userDoc._id.toString(), role: userDoc.role };
 +    const token = jwt.sign(payload, process.env.JWT_SECRET!, { expiresIn: "1h" });

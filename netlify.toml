@@ -1,0 +1,7 @@
+# Netlify – @netlify/plugin-nextjs handles build/publish.
+# Required: Site settings → Environment variables
+#   MONGODB_URI  = your MongoDB connection string (required)
+#   JWT_SECRET   = long random string for JWT (required)
+
+[build.environment]
+  NODE_VERSION = "18"
