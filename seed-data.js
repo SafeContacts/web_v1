@@ -47,11 +47,10 @@ const sampleBusinesses = [
 ];
 
 async function seed() {
-  // 3. Connect
-  //const uri = process.env.MONGODB_URI;
-  console.log('✅ .............Connecting to MongoDB');
-  const uri = "mongodb+srv://safecontacts:hansraj@cluster0.aquzss3.mongodb.net/?retryWrites=true&w=majority&appName=cluster0"
+  // 3. Connect (use env only – do not commit credentials)
+  const uri = process.env.MONGODB_URI;
   if (!uri) throw new Error('MONGODB_URI not set in .env');
+  console.log('✅ .............Connecting to MongoDB');
   await mongoose.connect(uri);
   console.log('✅ Connected to MongoDB');
 
