@@ -40,9 +40,14 @@ import {
   Avatar,
 } from "@chakra-ui/react";
 import { SearchIcon, AddIcon, RepeatIcon, PhoneIcon, EmailIcon, ViewIcon } from "@chakra-ui/icons";
+import CallButton from "../components/CallButton";
+import SmsButton from "../components/SmsButton";
+import { WhatsAppButton } from "../components/WhatsAppButton";
 
 interface Contact {
   _id: string;
+  shortId?: string;
+  weight?: number;
   name?: string;
   alias?: string;
   tags?: string[];
@@ -67,6 +72,8 @@ export default function HomePage() {
   const router = useRouter();
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen: isDetailOpen, onOpen: onDetailOpen, onClose: onDetailClose } = useDisclosure();
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -251,6 +258,15 @@ export default function HomePage() {
           isClosable: true,
         });
         await loadContacts();
+      } else if (resp.status === 409) {
+        const data = await resp.json();
+        toast({
+          title: "Duplicate contact",
+          description: data.message || "A contact with this phone number already exists.",
+          status: "warning",
+          duration: 5000,
+          isClosable: true,
+        });
       } else if (resp.status === 401) {
         router.push("/login");
       } else {
@@ -454,116 +470,129 @@ export default function HomePage() {
           </CardBody>
         </Card>
       ) : (
-        <Grid templateColumns={{ base: "1fr", md: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }} gap={6}>
-          {filtered.map((c) => {
-            // Get name from multiple possible sources
-            const name = c.name || c.alias || c.phones?.[0]?.value || c.person?.phones?.[0]?.value || "Unnamed";
-            const phones = c.phones || c.person?.phones || [];
-            const emails = c.emails || c.person?.emails || [];
-            const phone = phones[0]?.value || "";
-            const email = emails[0]?.value || "";
-            const company = c.company || getCompany(c);
-            const score = c.trustScore ?? c.person?.trustScore ?? 0;
-            const scoreColor = score >= 80 ? "green" : score >= 50 ? "yellow" : "red";
+        <Card bg={cardBg} borderColor={borderColor} borderWidth="1px" overflow="hidden">
+          <VStack spacing={0} align="stretch" divider={<Box h="1px" bg={borderColor} />}>
+            {filtered.map((c) => {
+              const name = c.name || c.alias || c.phones?.[0]?.value || c.person?.phones?.[0]?.value || "Unnamed";
+              const phones = c.phones || c.person?.phones || [];
+              const phone = phones[0]?.value || "";
+              const score = c.trustScore ?? c.person?.trustScore ?? 0;
+              const scoreColor = score >= 80 ? "green" : score >= 50 ? "yellow" : "red";
+              const weight = c.weight ?? 1;
+              const shortId = c.shortId ?? c._id?.slice(-6) ?? "";
 
-            return (
-              <Card
-                key={c._id}
-                bg={cardBg}
-                borderColor={borderColor}
-                borderWidth="1px"
-                _hover={{ shadow: "xl", transform: "translateY(-4px)", borderColor: "primary.300" }}
-                transition="all 0.3s"
-                cursor="pointer"
-                onClick={() => router.push(`/contact/${c._id}`)}
-              >
-                <CardHeader pb={2}>
-                  <Flex justify="space-between" align="start">
-                    <HStack spacing={3}>
-                      <Avatar
-                        name={name}
-                        size="md"
-                        bgGradient="linear(to-br, primary.500, brand.500)"
-                      />
-                      <Box>
-                        <Heading size="md" fontWeight="semibold" noOfLines={1}>
-                          {name}
-                        </Heading>
-                        {company && (
-                          <Text fontSize="sm" color="gray.500" noOfLines={1}>
-                            {company}
-                          </Text>
-                        )}
-                      </Box>
-                    </HStack>
-                    <Badge colorScheme={scoreColor} fontSize="xs" px={2} py={1}>
-                      {score}%
-                    </Badge>
-                  </Flex>
-                </CardHeader>
-                <CardBody pt={0}>
-                  <VStack align="stretch" spacing={3}>
-                    {phone && (
-                      <HStack spacing={2} color="gray.600">
-                        <PhoneIcon w={4} h={4} />
-                        <Text fontSize="sm" noOfLines={1}>
-                          {phone}
-                        </Text>
-                      </HStack>
+              return (
+                <Flex
+                  key={c._id}
+                  align="center"
+                  py={3}
+                  px={4}
+                  _hover={{ bg: hoverBg }}
+                  cursor="pointer"
+                  onClick={() => {
+                    setSelectedContact(c);
+                    onDetailOpen();
+                  }}
+                >
+                  <Avatar
+                    name={name}
+                    size="sm"
+                    mr={3}
+                    bgGradient="linear(to-br, primary.500, brand.500)"
+                  />
+                  <Box flex={1} minW={0}>
+                    <Text fontWeight="semibold" noOfLines={1}>{name}</Text>
+                    <Text fontSize="sm" color="gray.500" noOfLines={1}>{phone || "—"}</Text>
+                  </Box>
+                  <HStack spacing={2} flexShrink={0}>
+                    <Badge colorScheme="blue" fontSize="xs" title="Weight">W:{weight}</Badge>
+                    <Badge colorScheme={scoreColor} fontSize="xs" title="Trust %">{score}%</Badge>
+                    {shortId && (
+                      <Text fontSize="xs" color="gray.400" title="ID">{shortId}</Text>
                     )}
-                    {email && (
-                      <HStack spacing={2} color="gray.600">
-                        <EmailIcon w={4} h={4} />
-                        <Text fontSize="sm" noOfLines={1}>
-                          {email}
-                        </Text>
-                      </HStack>
-                    )}
-                    {company && (
-                      <HStack spacing={2} color="gray.600">
-                        <ViewIcon w={4} h={4} />
-                        <Text fontSize="sm" noOfLines={1}>
-                          {company}
-                        </Text>
-                      </HStack>
-                    )}
-                    {c.tags && c.tags.length > 0 && (
-                      <HStack spacing={2} flexWrap="wrap">
-                        {c.tags.slice(0, 3).map((tag) => (
-                          <Badge key={tag} colorScheme="primary" fontSize="xs" px={2} py={1}>
-                            {tag}
-                          </Badge>
-                        ))}
-                        {c.tags.length > 3 && (
-                          <Badge colorScheme="gray" fontSize="xs" px={2} py={1}>
-                            +{c.tags.length - 3}
-                          </Badge>
-                        )}
-                      </HStack>
-                    )}
-                    <Box>
-                      <Text fontSize="xs" color="gray.400" mb={1}>
-                        Trust Score
-                      </Text>
-                      <Progress
-                        value={score}
-                        colorScheme={scoreColor}
-                        size="sm"
-                        borderRadius="full"
-                      />
-                    </Box>
-                    {c.updatedAt && (
-                      <Text fontSize="xs" color="gray.400">
-                        Updated {formatRelative(c.updatedAt)}
-                      </Text>
-                    )}
-                  </VStack>
-                </CardBody>
-              </Card>
-            );
-          })}
-        </Grid>
+                  </HStack>
+                </Flex>
+              );
+            })}
+          </VStack>
+        </Card>
       )}
+
+      {/* Contact detail dialog: full info + Message, Call, Email */}
+      <Modal isOpen={isDetailOpen} onClose={onDetailClose} size="md">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Contact</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            {selectedContact && (
+              <VStack align="stretch" spacing={4}>
+                <Flex align="center">
+                  <Avatar
+                    name={selectedContact.name || selectedContact.alias}
+                    size="lg"
+                    mr={4}
+                    bgGradient="linear(to-br, primary.500, brand.500)"
+                  />
+                  <Box>
+                    <Heading size="md">{selectedContact.name || selectedContact.alias || "Unnamed"}</Heading>
+                    <Text fontSize="sm" color="gray.500">
+                      {(selectedContact.phones?.[0]?.value || selectedContact.person?.phones?.[0]?.value) ?? "—"}
+                    </Text>
+                    <HStack mt={2} spacing={2}>
+                      <Badge colorScheme="blue">W: {selectedContact.weight ?? 1}</Badge>
+                      <Badge colorScheme={selectedContact.trustScore && selectedContact.trustScore >= 80 ? "green" : selectedContact.trustScore && selectedContact.trustScore >= 50 ? "yellow" : "red"}>
+                        {selectedContact.trustScore ?? 0}%
+                      </Badge>
+                    </HStack>
+                  </Box>
+                </Flex>
+                {(selectedContact.emails?.length || selectedContact.person?.emails?.length) ? (
+                  <Box>
+                    <Text fontSize="xs" color="gray.500" mb={1}>Email</Text>
+                    <Text fontSize="sm">{(selectedContact.emails?.[0]?.value || selectedContact.person?.emails?.[0]?.value) ?? "—"}</Text>
+                  </Box>
+                ) : null}
+                {(selectedContact.company || getCompany(selectedContact)) && (
+                  <Box>
+                    <Text fontSize="xs" color="gray.500" mb={1}>Company</Text>
+                    <Text fontSize="sm">{selectedContact.company || getCompany(selectedContact)}</Text>
+                  </Box>
+                )}
+                {selectedContact.tags && selectedContact.tags.length > 0 && (
+                  <HStack flexWrap="wrap">
+                    {selectedContact.tags.map((tag) => (
+                      <Badge key={tag} colorScheme="primary" fontSize="xs">{tag}</Badge>
+                    ))}
+                  </HStack>
+                )}
+                <Box pt={2} borderTopWidth="1px" borderColor={borderColor}>
+                  <Text fontSize="xs" color="gray.500" mb={2}>Quick actions</Text>
+                  <HStack spacing={2} flexWrap="wrap">
+                    {(() => {
+                      const p = selectedContact.phones?.[0]?.value || selectedContact.person?.phones?.[0]?.value || "";
+                      if (!p) return null;
+                      return (
+                        <>
+                          <CallButton contactId={selectedContact._id} phone={p} />
+                          <SmsButton contactId={selectedContact._id} phone={p} />
+                          <WhatsAppButton phoneNumber={p} />
+                          <Button size="sm" as="a" href={`mailto:${selectedContact.emails?.[0]?.value || selectedContact.person?.emails?.[0]?.value || ""}`} leftIcon={<EmailIcon />}>
+                            Email
+                          </Button>
+                        </>
+                      );
+                    })()}
+                  </HStack>
+                </Box>
+                <Button size="sm" variant="outline" w="full" onClick={() => { onDetailClose(); router.push(`/contact/${selectedContact._id}`); }}>
+                  Open full profile
+                </Button>
+              </VStack>
+            )}
+          </ModalBody>
+        </ModalContent>
+      </Modal>
 
       {/* Add Contact Modal */}
       <Modal isOpen={isOpen} onClose={onClose} size="md">

@@ -46,6 +46,8 @@ const navLinks = [
   { label: 'Network', href: '/network', icon: ViewIcon },
   { label: 'Connection Requests', href: '/connection-requests', icon: ChatIcon },
   { label: 'Dialer', href: '/dialer', icon: PhoneIcon },
+  { label: 'Calls', href: '/calls', icon: PhoneIcon },
+  { label: 'Messages', href: '/messages', icon: ChatIcon },
   { label: 'Duplicates', href: '/duplicates', icon: RepeatIcon },
 ];
 
@@ -55,11 +57,13 @@ export default function Layout({ children }: LayoutProps) {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userName, setUserName] = useState<string>('');
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
 
   const bgHeader = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const bgMain = useColorModeValue('gray.50', 'gray.900');
 
+  // Re-check auth when route changes so nav updates after login/register
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     setIsAuthenticated(!!token);
@@ -71,7 +75,20 @@ export default function Layout({ children }: LayoutProps) {
         setUserName('User');
       }
     }
-  }, []);
+  }, [router.pathname]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setPendingRequestsCount(0);
+      return;
+    }
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (!token) return;
+    fetch('/api/network/connect?type=incoming', { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.ok ? r.json() : [])
+      .then((arr) => setPendingRequestsCount(Array.isArray(arr) ? arr.length : 0))
+      .catch(() => setPendingRequestsCount(0));
+  }, [isAuthenticated, router.pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem('accessToken');
@@ -151,6 +168,7 @@ export default function Layout({ children }: LayoutProps) {
             {navLinks.map((link) => {
               const Icon = link.icon;
               const active = isActive(link.href);
+              const showBadge = link.href === '/connection-requests' && pendingRequestsCount > 0;
               return (
                 <Box
                   key={link.href}
@@ -174,6 +192,9 @@ export default function Layout({ children }: LayoutProps) {
                 >
                   <Icon w={4} h={4} />
                   {link.label}
+                  {showBadge && (
+                    <Badge colorScheme="red" fontSize="xs" ml={1}>{pendingRequestsCount}</Badge>
+                  )}
                 </Box>
               );
             })}

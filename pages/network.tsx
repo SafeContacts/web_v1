@@ -234,46 +234,55 @@ export default function Network() {
             </CardBody>
           </Card>
 
-          {/* Edges */}
+          {/* Edges: who is connected to whom; used for trust/network visibility and weight */}
           <Card bg={cardBg} borderColor={borderColor} borderWidth="1px">
             <CardBody>
-              <Heading size="md" mb={4}>
+              <Heading size="md" mb={2}>
                 Connections ({graph?.edges.length || 0})
               </Heading>
+              <Text fontSize="sm" color="gray.500" mb={4}>
+                Direct links between you and your contacts. Weight = interaction strength (e.g. adds, approvals). Level 1 = direct contact.
+              </Text>
               <VStack align="stretch" spacing={2}>
-                {graph?.edges.map((edge, idx) => (
-                  <HStack
-                    key={idx}
-                    p={3}
-                    bg={useColorModeValue('gray.50', 'gray.700')}
-                    borderRadius="lg"
-                    justify="space-between"
-                  >
-                    <HStack spacing={3}>
-                      <Text fontSize="sm">
-                        {edge.source} → {edge.target}
-                      </Text>
-                      {edge.relation && (
-                        <Badge
-                          colorScheme={edge.relation === 'trust' ? 'green' : 'blue'}
-                          fontSize="xs"
-                        >
-                          {edge.relation}
-                        </Badge>
-                      )}
-                      {edge.level && (
-                        <Badge colorScheme="purple" fontSize="xs">
-                          Level {edge.level}
-                        </Badge>
-                      )}
-                      {edge.weight && (
-                        <Badge colorScheme="gray" fontSize="xs">
-                          Weight {edge.weight}
-                        </Badge>
-                      )}
+                {graph?.edges.map((edge, idx) => {
+                  const srcNode = graph?.nodes.find((n) => n.id === edge.source);
+                  const tgtNode = graph?.nodes.find((n) => n.id === edge.target);
+                  const srcLabel = srcNode?.label || edge.source.slice(-6);
+                  const tgtLabel = tgtNode?.label || edge.target.slice(-6);
+                  return (
+                    <HStack
+                      key={idx}
+                      p={3}
+                      bg={useColorModeValue('gray.50', 'gray.700')}
+                      borderRadius="lg"
+                      justify="space-between"
+                    >
+                      <HStack spacing={3} flexWrap="wrap">
+                        <Text fontSize="sm" fontWeight="medium">
+                          {srcLabel} → {tgtLabel}
+                        </Text>
+                        {edge.relation && (
+                          <Badge
+                            colorScheme={edge.relation === 'trust' ? 'green' : 'blue'}
+                            fontSize="xs"
+                          >
+                            {edge.relation.toUpperCase()}
+                          </Badge>
+                        )}
+                        {edge.level != null && (
+                          <Badge colorScheme="purple" fontSize="xs">
+                            Level {edge.level}
+                          </Badge>
+                        )}
+                        {edge.weight != null && (
+                          <Badge colorScheme="gray" fontSize="xs">
+                            Weight {edge.weight}
+                          </Badge>
+                        )}
+                      </HStack>
                     </HStack>
-                  </HStack>
-                ))}
+                  );
+                })}
               </VStack>
             </CardBody>
           </Card>

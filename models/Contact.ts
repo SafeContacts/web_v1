@@ -16,22 +16,35 @@ const EmailSchema = new Schema({
 const ContactSchema = new Schema(
   {
     userId: { type: String, required: true, index: true },
+    personId: { type: Schema.Types.ObjectId, ref: "Person", default: null }, // Links to network Person for weight
+    primaryPhoneNorm: { type: String, default: "", index: true }, // Normalized digits only, for duplicate check (not encrypted)
     name: { type: String, required: true },
     phones: { type: [PhoneSchema], default: [] },
     emails: { type: [EmailSchema], default: [] },
     addresses: { type: [String], default: [] },
     notes: { type: String, default: "" },
     trustScore: { type: Number, default: 0, min: 0, max: 100 },
+    weight: { type: Number, default: 1 }, // Relationship strength from ContactEdge
     company: { type: String },
     tags: { type: [String], default: [] },
     linkedIn: { type: String },
     twitter: { type: String },
-    isRegistered: {type: Boolean},
+    isRegistered: { type: Boolean },
     instagram: { type: String },
     encrypted: { type: Boolean, default: true }, // Flag to indicate if data is encrypted
   },
   { timestamps: true },
 );
+ContactSchema.index({ userId: 1, primaryPhoneNorm: 1 }, { unique: false }); // For duplicate lookup
+
+// Set primaryPhoneNorm for duplicate detection (before encrypt)
+ContactSchema.pre('save', function(next) {
+  const rawPhone = (this as any).phones?.[0]?.value;
+  if (rawPhone != null && typeof rawPhone === 'string') {
+    (this as any).primaryPhoneNorm = rawPhone.replace(/\D/g, '') || '';
+  }
+  next();
+});
 
 // Encrypt before saving
 ContactSchema.pre('save', function(next) {

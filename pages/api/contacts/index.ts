@@ -28,12 +28,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       // Fetch contacts (encrypted in storage)
       const contacts = await Contact.find({ userId });
       
-      // Decrypt only for the authorized user
+      // Decrypt and add shortId / weight for display (no raw DB id in UI)
       const decryptedContacts = contacts.map((contact: any) => {
         if (contact.decryptForUser) {
-          return contact.decryptForUser();
+          const doc = contact.decryptForUser();
+          const id = doc._id?.toString?.() || '';
+          doc.shortId = id ? id.slice(-6) : '';
+          doc.weight = doc.weight ?? 1;
+          return doc;
         }
-        // Fallback: manual decryption
         const doc = contact.toObject ? contact.toObject() : contact;
         if (doc.encrypted !== false) {
           const { decrypt } = require("../../../lib/encryption");
@@ -60,6 +63,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             console.error('Decryption error:', err);
           }
         }
+        const id = doc._id?.toString?.() || '';
+        doc.shortId = id ? id.slice(-6) : '';
+        doc.weight = doc.weight ?? 1;
         return doc;
       });
       
@@ -93,7 +99,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         const primaryPhone = phones[0].value;
         const countryCode = phones[0].countryCode || '+91';
         const phoneE164 = toE164(primaryPhone, countryCode);
+        const primaryPhoneNorm = String(primaryPhone || '').replace(/\D/g, '') || '';
         const emailValue = emails?.[0]?.value?.toLowerCase().trim();
+
+        // Duplicate check: same user + same normalized primary phone (only when we have digits)
+        if (primaryPhoneNorm.length > 0) {
+          const existingByPhone = await Contact.findOne({ userId: user.sub, primaryPhoneNorm }).lean();
+          if (existingByPhone) {
+            return res.status(409).json({
+              ok: false,
+              code: "DUPLICATE_CONTACT",
+              message: "A contact with this phone number already exists",
+              contactId: (existingByPhone as { _id: unknown })._id,
+            });
+          }
+        }
         
         // Search for existing Person by phone or email
         let person = await Person.findOne({
@@ -127,45 +147,47 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           person = await Person.create(personData);
         }
         
+        // Get user's personId and edge weight
+        const caller = await User.findById(user.sub).lean() as { personId?: unknown } | null | undefined;
+        let edgeWeight = 1;
+        if (caller && caller.personId && person) {
+          const fromPersonId = caller.personId;
+          const toPersonId = (person as { _id: unknown })._id;
+          const edge = await ContactEdge.findOneAndUpdate(
+            { fromPersonId, toPersonId },
+            { $inc: { weight: 1 }, lastContactedAt: new Date() },
+            { upsert: true, new: true }
+          ).lean();
+          edgeWeight = (edge as { weight?: number })?.weight ?? 1;
+          await ContactAlias.findOneAndUpdate(
+            { userId: user.sub, personId: toPersonId },
+            { alias: name, tags: [], notes: notes || "" },
+            { upsert: true, new: true }
+          );
+        }
+
         // Create Contact entry
         const contact = await Contact.create({
           userId: user.sub,
+          personId: person ? (person as { _id: unknown })._id : null,
+          primaryPhoneNorm: primaryPhoneNorm || undefined,
           name,
           phones,
           emails: emails || [],
           addresses: addresses || [],
           notes: notes || "",
           trustScore: 0,
+          weight: edgeWeight,
           linkedIn,
           twitter,
           instagram,
         });
-        
-        // Get user's personId
-        const caller = await User.findById(user.sub).lean() as { personId?: unknown } | null | undefined;
-        if (caller && caller.personId && person) {
-          const fromPersonId = caller.personId;
-          const toPersonId = (person as { _id: unknown })._id;
-          
-          // Create or update ContactAlias
-          await ContactAlias.findOneAndUpdate(
-            { userId: user.sub, personId: toPersonId },
-            { alias: name, tags: [], notes: notes || "" },
-            { upsert: true, new: true }
-          );
-          
-          // Create or update ContactEdge
-          await ContactEdge.findOneAndUpdate(
-            { fromPersonId, toPersonId },
-            { $inc: { weight: 1 }, lastContactedAt: new Date() },
-            { upsert: true, new: true }
-          );
-        }
-        
-        return res.status(201).json(contact);
+        const out = contact.toObject ? contact.toObject() : contact;
+        return res.status(201).json(out);
       } catch (err: any) {
-        console.error(err);
-        return res.status(500).json({ ok: false, code: "INTERNAL_ERROR", message: "Failed to create contact" });
+        console.error("[contacts POST]", err);
+        const message = err?.message || (err?.errors && Object.values(err.errors).map((e: any) => e?.message).filter(Boolean).join("; ")) || "Failed to create contact";
+        return res.status(500).json({ ok: false, code: "INTERNAL_ERROR", message });
       }
     }
     default:
