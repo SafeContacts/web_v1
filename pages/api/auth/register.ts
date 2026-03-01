@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import User   from '../../../models/User';
 import ContactEdge from '../../../models/ContactEdge';
 import ContactAlias from '../../../models/ContactAlias';
